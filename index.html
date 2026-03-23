@@ -1,0 +1,1378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SCALO Client Portal</title>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Helvetica Neue', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #F5F4F2;
+            color: #0D0D0D;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+        }
+
+        #root { width: 100%; height: 100vh; overflow: hidden; }
+
+        /* ── LOGIN ── */
+        .auth-container { width: 100%; height: 100vh; display: flex; }
+
+        .auth-left {
+            width: 380px;
+            background: linear-gradient(160deg, #2d0808 0%, #180518 50%, #060618 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 40px;
+            flex-shrink: 0;
+        }
+
+        .auth-left-logo { width: 72px; height: 72px; margin-bottom: 28px; }
+
+        .auth-left-heading {
+            color: #fff;
+            font-size: 26px;
+            text-align: center;
+            margin-bottom: 12px;
+            letter-spacing: -0.03em;
+        }
+
+        .auth-left-sub {
+            color: rgba(255,255,255,0.35);
+            font-size: 14px;
+            text-align: center;
+            line-height: 1.6;
+            font-weight: 400;
+        }
+
+        .auth-right {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #F5F4F2;
+            padding: 40px;
+        }
+
+        .login-box { width: 100%; max-width: 360px; }
+        .login-heading { font-size: 28px; margin-bottom: 8px; color: #0D0D0D; }
+
+        .login-subtext {
+            color: #999;
+            font-size: 14px;
+            margin-bottom: 32px;
+            font-weight: 400;
+        }
+
+        /* ── PORTAL LAYOUT ── */
+        .portal-layout { display: flex; height: 100vh; overflow: hidden; }
+
+        .portal-sidebar {
+            width: 220px;
+            background: linear-gradient(160deg, #2d0808 0%, #180518 50%, #060618 100%);
+            display: flex;
+            flex-direction: column;
+            padding: 28px 16px 24px;
+            flex-shrink: 0;
+            overflow-y: auto;
+        }
+
+        .sidebar-logo { width: 42px; height: 42px; margin-bottom: 36px; margin-left: 4px; }
+
+        .sidebar-nav { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+
+        .sidebar-nav-item {
+            padding: 11px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: rgba(255,255,255,0.4);
+            font-size: 13px;
+            font-weight: 700;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            letter-spacing: -0.01em;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+            border-left: 3px solid transparent;
+        }
+
+        .sidebar-nav-item:hover {
+            color: rgba(255,255,255,0.85);
+            background: rgba(255,255,255,0.07);
+        }
+
+        .sidebar-nav-item.active {
+            color: #fff;
+            background: rgba(232,67,45,0.18);
+            border-left-color: #E8432D;
+        }
+
+        .sidebar-nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
+
+        .sidebar-signout {
+            margin-top: 16px;
+            padding: 11px 14px;
+            border-radius: 10px;
+            cursor: pointer;
+            color: rgba(255,255,255,0.22);
+            font-size: 12px;
+            font-weight: 700;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            border: none;
+            background: none;
+            width: 100%;
+            text-align: left;
+            font-family: inherit;
+        }
+
+        .sidebar-signout:hover {
+            color: rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.05);
+        }
+
+        /* ── CONTENT AREA ── */
+        .portal-content-area {
+            flex: 1;
+            overflow-y: auto;
+            padding: 36px 40px;
+            background: #F5F4F2;
+        }
+
+        /* ── FORMS ── */
+        .form-group { margin-bottom: 16px; text-align: left; }
+
+        .form-label {
+            font-size: 10px;
+            color: #AAA;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        .form-input {
+            width: 100%;
+            background: #F7F7F7;
+            border: 1.5px solid #E5E5E5;
+            color: #0D0D0D;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #E8432D;
+            background: #fff;
+            box-shadow: 0 0 0 3px rgba(232,67,45,0.08);
+        }
+
+        .error-message { color: #E8432D; font-size: 13px; margin-top: 8px; min-height: 20px; font-weight: 400; }
+
+        .btn-primary {
+            width: 100%;
+            background: #E8432D;
+            border: none;
+            color: #fff;
+            padding: 13px;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 24px;
+            font-family: inherit;
+        }
+
+        .btn-primary:hover { background: #d1361f; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(232,67,45,0.3); }
+        .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; transform: none; box-shadow: none; }
+
+        .btn-secondary {
+            background: #F5F5F5;
+            border: 1px solid #E5E5E5;
+            color: #333;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+            width: 100%;
+            font-family: inherit;
+        }
+
+        .btn-secondary:hover { background: #EBEBEB; }
+
+        .btn-add {
+            background: #E8432D;
+            color: #fff;
+            border: none;
+            padding: 11px 20px;
+            border-radius: 8px;
+            font-weight: 700;
+            cursor: pointer;
+            font-size: 13px;
+            margin-bottom: 20px;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .btn-add:hover { background: #d1361f; box-shadow: 0 4px 14px rgba(232,67,45,0.3); }
+
+        .btn-back {
+            background: #F0F0F0;
+            border: none;
+            color: #555;
+            padding: 8px 14px;
+            border-radius: 8px;
+            font-size: 12px;
+            cursor: pointer;
+            margin-bottom: 24px;
+            font-weight: 700;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .btn-back:hover { background: #E5E5E5; }
+
+        /* ── PAGE HEADERS ── */
+        .page-title { font-size: 26px; color: #0D0D0D; margin-bottom: 6px; letter-spacing: -0.03em; }
+        .page-subtitle { color: #AAA; font-size: 13px; margin-bottom: 28px; font-weight: 400; }
+        .section-header { font-size: 11px; font-weight: 700; color: #999; margin-top: 24px; margin-bottom: 14px; letter-spacing: 0.12em; text-transform: uppercase; }
+
+        .greeting { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+        .greeting-text { font-size: 22px; color: #0D0D0D; letter-spacing: -0.02em; }
+
+        .week-badge {
+            background: rgba(232,67,45,0.07);
+            border: 1px solid rgba(232,67,45,0.2);
+            color: #E8432D;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        /* ── CARDS ── */
+        .card {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 16px;
+            padding: 22px 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .card-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .metric-card {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 14px;
+            padding: 18px 16px;
+            text-align: center;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+            transition: all 0.25s;
+        }
+
+        .metric-card:hover {
+            border-color: rgba(232,67,45,0.25);
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.07);
+        }
+
+        .metric-label { font-size: 9px; color: #BBB; font-weight: 700; letter-spacing: 0.15em; text-transform: uppercase; margin-bottom: 8px; }
+        .metric-value { font-size: 26px; font-weight: 700; color: #0D0D0D; margin-bottom: 6px; }
+        .metric-value.red { color: #E8432D; }
+        .metric-value.green { color: #16A34A; }
+        .sparkline-svg { width: 100%; height: 28px; margin-top: 4px; }
+
+        /* ── INPUT FORM ── */
+        .input-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .num-field {
+            width: 100%;
+            background: #F7F7F7;
+            border: 1.5px solid #E5E5E5;
+            color: #0D0D0D;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .num-field:focus { outline: none; border-color: #E8432D; background: #fff; box-shadow: 0 0 0 3px rgba(232,67,45,0.07); }
+
+        /* ── TASKS ── */
+        .task-item {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 12px;
+            padding: 18px;
+            margin-bottom: 12px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+
+        .task-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 12px; }
+        .task-title { font-size: 15px; font-weight: 700; color: #0D0D0D; }
+
+        .task-due {
+            background: rgba(232,67,45,0.07);
+            color: #E8432D;
+            padding: 3px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            white-space: nowrap;
+            font-weight: 700;
+        }
+
+        .task-description { color: #999; font-size: 13px; margin-bottom: 12px; line-height: 1.5; font-weight: 400; }
+        .checklist { margin-bottom: 12px; }
+        .checklist-item { display: flex; gap: 10px; margin-bottom: 8px; align-items: center; }
+        .checklist-checkbox { width: 16px; height: 16px; cursor: pointer; accent-color: #E8432D; flex-shrink: 0; }
+        .checklist-text { font-size: 13px; color: #555; flex: 1; font-weight: 400; }
+        .checklist-text.done { color: #CCC; text-decoration: line-through; }
+        .progress-bar { background: #F0F0F0; height: 4px; border-radius: 2px; overflow: hidden; margin-top: 8px; }
+        .progress-fill { background: #16A34A; height: 100%; transition: width 0.3s; }
+
+        /* ── CLIENT GRID ── */
+        .client-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .client-card {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 14px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .client-card:hover { border-color: rgba(232,67,45,0.25); transform: translateY(-3px); box-shadow: 0 8px 24px rgba(0,0,0,0.08); }
+
+        .client-avatar {
+            width: 46px;
+            height: 46px;
+            background: #E8432D;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            margin-bottom: 14px;
+            color: #fff;
+        }
+
+        .client-name { font-size: 15px; color: #0D0D0D; margin-bottom: 10px; }
+        .client-metric { font-size: 12px; color: #AAA; margin-bottom: 4px; font-weight: 400; }
+        .client-metric-value { color: #E8432D; font-weight: 700; }
+
+        /* ── CHARTS ── */
+        .chart-card {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        }
+
+        .chart-title { font-size: 11px; font-weight: 700; color: #999; margin-bottom: 20px; letter-spacing: 0.1em; text-transform: uppercase; }
+
+        /* ── MISC ── */
+        .search-box {
+            width: 100%;
+            background: #F7F7F7;
+            border: 1.5px solid #E5E5E5;
+            color: #0D0D0D;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+            margin-bottom: 20px;
+            font-family: inherit;
+            font-weight: 400;
+            transition: all 0.2s;
+        }
+
+        .search-box:focus { outline: none; border-color: #E8432D; background: #fff; box-shadow: 0 0 0 3px rgba(232,67,45,0.07); }
+
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.3);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 20px;
+            padding: 32px;
+            width: 90%;
+            max-width: 460px;
+            max-height: 90vh;
+            overflow-y: auto;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.12);
+        }
+
+        .modal-header { font-size: 20px; color: #0D0D0D; margin-bottom: 24px; }
+
+        .empty-state { text-align: center; padding: 48px 20px; color: #CCC; }
+        .empty-state-icon { font-size: 42px; margin-bottom: 14px; }
+
+        .textarea {
+            width: 100%;
+            background: #F7F7F7;
+            border: 1.5px solid #E5E5E5;
+            color: #0D0D0D;
+            border-radius: 10px;
+            padding: 12px 14px;
+            font-size: 14px;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.2s;
+            font-weight: 400;
+        }
+
+        .textarea:focus { outline: none; border-color: #E8432D; background: #fff; box-shadow: 0 0 0 3px rgba(232,67,45,0.07); }
+
+        .loading { display: flex; align-items: center; justify-content: center; height: 100vh; font-size: 15px; color: #CCC; background: #F5F4F2; }
+
+        /* ── CONTENT LIBRARY ── */
+        .content-card {
+            background: #fff;
+            border: 1px solid #EBEBEB;
+            border-radius: 14px;
+            padding: 16px 20px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            transition: all 0.2s;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+
+        .content-card:hover { border-color: rgba(232,67,45,0.2); transform: translateX(3px); box-shadow: 0 4px 14px rgba(0,0,0,0.06); }
+
+        .content-rank { font-size: 20px; font-weight: 700; color: #DDD; min-width: 40px; text-align: center; flex-shrink: 0; }
+        .rank-gold { color: #D97706; }
+        .rank-silver { color: #6B7280; }
+        .rank-bronze { color: #92400E; }
+
+        .content-body { flex: 1; min-width: 0; }
+
+        .content-title {
+            font-size: 14px;
+            font-weight: 700;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 6px;
+            color: #0D0D0D;
+        }
+
+        .content-views { text-align: right; min-width: 65px; flex-shrink: 0; }
+        .content-views-number { font-size: 22px; font-weight: 700; color: #E8432D; line-height: 1; }
+        .content-views-label { font-size: 9px; color: #CCC; text-transform: uppercase; letter-spacing: 0.12em; margin-top: 2px; }
+        .content-delete-btn { background: none; border: none; color: #CCC; font-size: 18px; cursor: pointer; padding: 0; line-height: 1; transition: color 0.2s; flex-shrink: 0; }
+        .content-delete-btn:hover { color: #E8432D; }
+
+        .platform-badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 700; white-space: nowrap; color: #fff; vertical-align: middle; }
+        .platform-instagram { background: linear-gradient(135deg, #f09433 0%, #e6683c 25%, #dc2743 50%, #cc2366 75%, #bc1888 100%); }
+        .platform-tiktok { background: #111; }
+        .platform-youtube { background: #FF0000; }
+
+        /* ── RESPONSIVE ── */
+        @media (max-width: 900px) { .auth-left { width: 300px; } }
+
+        @media (max-width: 640px) {
+            .auth-left { display: none; }
+            .portal-sidebar { width: 58px; padding: 20px 8px; align-items: center; }
+            .sidebar-logo { margin-left: 0; margin-bottom: 24px; width: 36px; height: 36px; }
+            .sidebar-nav-item { justify-content: center; padding: 10px; gap: 0; }
+            .sidebar-nav-item .nav-label { display: none; }
+            .sidebar-signout { justify-content: center; padding: 10px; gap: 0; }
+            .sidebar-signout .nav-label { display: none; }
+            .portal-content-area { padding: 20px 16px; }
+            .card-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script>
+        const FIREBASE_CONFIG = {
+            apiKey: "AIzaSyDse51E4WeHoVR9iDmK02IX8vNnHRIgtho",
+            authDomain: "scalo-client-portal.firebaseapp.com",
+            databaseURL: "https://scalo-client-portal-default-rtdb.firebaseio.com",
+            projectId: "scalo-client-portal",
+            storageBucket: "scalo-client-portal.firebasestorage.app",
+            messagingSenderId: "630899234744",
+            appId: "1:630899234744:web:f862a414388cd79fa7a14d"
+        };
+
+        const SCALO_LOGO = 'data:image/png;base64,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';
+
+        firebase.initializeApp(FIREBASE_CONFIG);
+        const db = firebase.database();
+        const auth = firebase.auth();
+
+        let currentUser = null;
+        let authLoading = true;
+        let currentPage = 'hub';
+        let selectedClientDetail = null;
+        let progressChartData = null;
+
+        // ── HELPERS ──
+        const getWeekKey = () => {
+            const d = new Date(), s = new Date(d.getFullYear(), 0, 1);
+            const week = Math.ceil(((d - s) / 86400000 + s.getDay() + 1) / 7);
+            return `${d.getFullYear()}_W${String(week).padStart(2, '0')}`;
+        };
+
+        const formatCurrency = (val) => val ? `£${(parseFloat(val) || 0).toLocaleString('en-GB', {maximumFractionDigits: 0})}` : '£0';
+
+        const formatNumber = (val) => {
+            if (!val) return '0';
+            const num = parseFloat(val);
+            if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+            return num.toString();
+        };
+
+        const generateSparkline = (data, width = 100, height = 28) => {
+            if (!data || data.length < 2) return '';
+            const values = data.map(v => parseFloat(v) || 0);
+            const max = Math.max(...values);
+            const min = Math.min(...values);
+            const range = max - min || 1;
+            const pointWidth = width / (data.length - 1);
+            let path = '';
+            values.forEach((val, i) => {
+                const x = i * pointWidth;
+                const y = height - ((val - min) / range) * (height * 0.8) - (height * 0.1);
+                path += (i === 0 ? 'M' : 'L') + x + ',' + y;
+            });
+            return `<svg class="sparkline-svg" viewBox="0 0 ${width} ${height}" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="#E8432D" stroke-width="2"/></svg>`;
+        };
+
+        const daysUntilDate = (dateStr) => {
+            const due = new Date(dateStr);
+            const now = new Date();
+            const days = Math.ceil((due - now) / (1000 * 60 * 60 * 24));
+            return days > 0 ? `in ${days}d` : days === 0 ? 'today' : `${Math.abs(days)}d ago`;
+        };
+
+        // ── LOGIN ──
+        let authMode = 'signin'; // 'signin' or 'signup'
+
+        const renderLoginPage = () => `
+            <div class="auth-container">
+                <div class="auth-left">
+                    <img src="${SCALO_LOGO}" alt="SCALO" class="auth-left-logo">
+                    <div class="auth-left-heading">SCALO Coaching Portal</div>
+                    <div class="auth-left-sub">Track your numbers.<br>Grow your business.</div>
+                </div>
+                <div class="auth-right">
+                    <div class="login-box">
+                        <div style="display:flex;gap:0;background:#EBEBEB;border-radius:10px;padding:3px;margin-bottom:32px;">
+                            <button id="tabSignIn" onclick="switchAuthMode('signin')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;transition:all 0.2s;background:${authMode==='signin'?'#fff':'transparent'};color:${authMode==='signin'?'#0D0D0D':'#999'};box-shadow:${authMode==='signin'?'0 1px 4px rgba(0,0,0,0.1)':'none'};">Sign In</button>
+                            <button id="tabSignUp" onclick="switchAuthMode('signup')" style="flex:1;padding:10px;border:none;border-radius:8px;font-size:13px;font-weight:700;font-family:inherit;cursor:pointer;transition:all 0.2s;background:${authMode==='signup'?'#fff':'transparent'};color:${authMode==='signup'?'#0D0D0D':'#999'};box-shadow:${authMode==='signup'?'0 1px 4px rgba(0,0,0,0.1)':'none'};">Create Account</button>
+                        </div>
+                        ${authMode === 'signup' ? `
+                            <div style="display:flex;gap:12px;">
+                                <div class="form-group" style="flex:1;"><label class="form-label">First Name</label><input type="text" id="signupFirst" class="form-input" placeholder="John"></div>
+                                <div class="form-group" style="flex:1;"><label class="form-label">Last Name</label><input type="text" id="signupLast" class="form-input" placeholder="Doe"></div>
+                            </div>
+                        ` : `<h1 class="login-heading" style="margin-bottom:8px;">Welcome back</h1><p class="login-subtext">Sign in to your portal</p>`}
+                        <div class="form-group">
+                            <label class="form-label">Email</label>
+                            <input type="email" id="loginEmail" class="form-input" placeholder="you@example.com">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Password</label>
+                            <input type="password" id="loginPassword" class="form-input" placeholder="&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;&#x2022;">
+                        </div>
+                        <div class="error-message" id="loginError"></div>
+                        <button class="btn-primary" id="signInBtn">${authMode === 'signup' ? 'Create Account &#x2192;' : 'Sign In &#x2192;'}</button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        window.switchAuthMode = (mode) => { authMode = mode; render(); };
+
+        const handleSignIn = async () => {
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            if (!email || !password) { errorDiv.textContent = 'Please enter email and password'; return; }
+            try {
+                errorDiv.textContent = authMode === 'signup' ? 'Creating account...' : 'Signing in...';
+                if (authMode === 'signup') {
+                    const firstName = (document.getElementById('signupFirst')?.value || '').trim();
+                    const lastName = (document.getElementById('signupLast')?.value || '').trim();
+                    if (!firstName) { errorDiv.textContent = 'Please enter your first name'; return; }
+                    const cred = await auth.createUserWithEmailAndPassword(email, password);
+                    const isAdmin = email === 'timbrace14@gmail.com';
+                    // Write profile to DB — non-blocking so login isn't stuck if DB isn't ready
+                    db.ref(`portal/users/${cred.user.uid}`).set({
+                        firstName, lastName, email,
+                        role: isAdmin ? 'admin' : 'client',
+                        createdAt: new Date().toISOString()
+                    }).catch(() => {});
+                } else {
+                    await auth.signInWithEmailAndPassword(email, password);
+                }
+            } catch (err) {
+                const msg = err.message || 'Sign in failed';
+                const friendly = msg.includes('configuration-not-found')
+                    ? 'Firebase auth not set up yet. Please enable Email/Password in Firebase Console → Authentication → Sign-in method.'
+                    : msg.includes('user-not-found') || msg.includes('wrong-password') || msg.includes('invalid-credential')
+                    ? 'Incorrect email or password.'
+                    : msg.includes('email-already-in-use')
+                    ? 'An account with this email already exists. Try signing in instead.'
+                    : msg;
+                errorDiv.textContent = friendly;
+            }
+        };
+
+        // ── METRIC CARD ──
+        const MetricCard = (label, value, trend = null, isCurrency = false, isPercent = false, isGood = null) => {
+            let displayValue = value, valueClass = '';
+            if (isCurrency) { displayValue = formatCurrency(value); }
+            else if (isPercent) {
+                displayValue = `${parseFloat(value || 0).toFixed(1)}%`;
+                if (isGood === true) valueClass = 'green';
+                else if (isGood === false) valueClass = 'red';
+            } else { displayValue = formatNumber(value); }
+            const sparkline = trend && trend.length > 1 ? generateSparkline(trend) : '';
+            return `<div class="metric-card">
+                <div class="metric-label">${label}</div>
+                <div class="metric-value ${valueClass}">${displayValue}</div>
+                ${sparkline}
+            </div>`;
+        };
+
+        // ── CLIENT HUB ──
+        const renderClientHub = async () => {
+            const weekKey = getWeekKey();
+            const [entriesSnap, tasksSnap] = await Promise.all([
+                db.ref(`portal/entries/${currentUser.uid}`).once('value'),
+                db.ref(`portal/tasks/${currentUser.uid}`).once('value')
+            ]);
+            const entries = entriesSnap.val() || {};
+            const tasks = tasksSnap.val() || {};
+            const currentEntry = entries[weekKey] || {};
+
+            const last8Weeks = [];
+            for (let i = 7; i >= 0; i--) {
+                const d = new Date(); d.setDate(d.getDate() - (7 - i) * 7);
+                const s = new Date(d.getFullYear(), 0, 1);
+                const week = Math.ceil(((d - s) / 86400000 + s.getDay() + 1) / 7);
+                const wk = `${d.getFullYear()}_W${String(week).padStart(2, '0')}`;
+                last8Weeks.push(entries[wk] || {});
+            }
+
+            const calcMetric = (key) => last8Weeks.map(w => parseFloat(w[key]) || 0);
+            const revenue = parseFloat(currentEntry.revenue) || 0;
+            const expenses = parseFloat(currentEntry.expenses) || 0;
+            const profitMargin = revenue > 0 ? ((revenue - expenses) / revenue * 100) : 0;
+            const occupancy = (parseFloat(currentEntry.appointmentsAvailable) || 0) > 0
+                ? (parseFloat(currentEntry.appointmentsFilled) || 0) / parseFloat(currentEntry.appointmentsAvailable) * 100 : 0;
+            const rebook = (parseFloat(currentEntry.appointmentsFilled) || 0) > 0
+                ? (parseFloat(currentEntry.rebookings) || 0) / parseFloat(currentEntry.appointmentsFilled) * 100 : 0;
+
+            const incompleteTasks = Object.entries(tasks).filter(([, task]) => {
+                const checklist = task.checklist || {};
+                return Object.values(checklist).some(item => !item.done);
+            }).slice(0, 3);
+
+            return `
+                <div>
+                    <div class="greeting">
+                        <div class="greeting-text">Good morning, <strong>${currentUser.firstName}</strong></div>
+                        <div class="week-badge">${weekKey}</div>
+                    </div>
+                    <div class="card-grid">
+                        ${MetricCard('Total Revenue', revenue, calcMetric('revenue'), true)}
+                        ${MetricCard('Expenses', expenses, calcMetric('expenses'), true)}
+                        ${MetricCard('Profit Margin', profitMargin, calcMetric('revenue'), false, true, profitMargin > 30)}
+                        ${MetricCard('Occupancy Rate', occupancy, calcMetric('appointmentsFilled'), false, true)}
+                        ${MetricCard('Rebook Rate', rebook, calcMetric('rebookings'), false, true)}
+                        ${MetricCard('New Clients', currentEntry.newClients, calcMetric('newClients'))}
+                        ${MetricCard('Total Views', (parseFloat(currentEntry.instagramViews)||0)+(parseFloat(currentEntry.tiktokViews)||0),
+                            last8Weeks.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)))}
+                        ${MetricCard('New Followers', (parseFloat(currentEntry.instagramFollowers)||0)+(parseFloat(currentEntry.tiktokFollowers)||0),
+                            last8Weeks.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)))}
+                    </div>
+                    <div class="card">
+                        <div class="section-header">Pending Tasks</div>
+                        ${incompleteTasks.length === 0 ? '<div style="color:#CCC;text-align:center;padding:20px;font-weight:400;">No pending tasks &#x2713;</div>' : ''}
+                        ${incompleteTasks.map(([taskId, task]) => {
+                            const checklist = task.checklist || {};
+                            const items = Object.values(checklist);
+                            const doneCount = items.filter(i => i.done).length;
+                            return `<div class="task-item">
+                                <div class="task-header">
+                                    <div>
+                                        <div class="task-title">${task.title}</div>
+                                        ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                                    </div>
+                                    ${task.dueDate ? `<div class="task-due">${daysUntilDate(task.dueDate)}</div>` : ''}
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width:${items.length > 0 ? (doneCount/items.length*100) : 0}%"></div>
+                                </div>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        // ── NUMBERS ──
+        const renderClientNumbers = async () => {
+            const weekKey = getWeekKey();
+            const snap = await db.ref(`portal/entries/${currentUser.uid}/${weekKey}`).once('value');
+            const data = snap.val() || {};
+            return `
+                <div>
+                    <h2 class="page-title">This Week&#x2019;s Numbers</h2>
+                    <p class="page-subtitle">${weekKey}</p>
+                    <div class="card">
+                        <div class="section-header">Business</div>
+                        <div class="input-grid">
+                            <div><div class="form-label">Appts Available</div><input type="number" class="num-field" data-key="appointmentsAvailable" value="${data.appointmentsAvailable||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">Appts Filled</div><input type="number" class="num-field" data-key="appointmentsFilled" value="${data.appointmentsFilled||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">New Clients</div><input type="number" class="num-field" data-key="newClients" value="${data.newClients||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">Rebookings</div><input type="number" class="num-field" data-key="rebookings" value="${data.rebookings||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">No Shows</div><input type="number" class="num-field" data-key="noShows" value="${data.noShows||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">Revenue</div>
+                                <div style="position:relative;"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#AAA;font-size:14px;">&#xA3;</span>
+                                <input type="number" class="num-field" data-key="revenue" value="${data.revenue||''}" inputmode="numeric" style="padding-left:28px;"></div></div>
+                            <div><div class="form-label">Expenses</div>
+                                <div style="position:relative;"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#AAA;font-size:14px;">&#xA3;</span>
+                                <input type="number" class="num-field" data-key="expenses" value="${data.expenses||''}" inputmode="numeric" style="padding-left:28px;"></div></div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="section-header">Social &amp; Content</div>
+                        <div class="input-grid">
+                            <div><div class="form-label">IG Posts</div><input type="number" class="num-field" data-key="instagramPosts" value="${data.instagramPosts||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">IG Views</div><input type="number" class="num-field" data-key="instagramViews" value="${data.instagramViews||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">IG Followers</div><input type="number" class="num-field" data-key="instagramFollowers" value="${data.instagramFollowers||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">TikTok Posts</div><input type="number" class="num-field" data-key="tiktokPosts" value="${data.tiktokPosts||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">TikTok Views</div><input type="number" class="num-field" data-key="tiktokViews" value="${data.tiktokViews||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">TikTok Followers</div><input type="number" class="num-field" data-key="tiktokFollowers" value="${data.tiktokFollowers||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">Emails Sent</div><input type="number" class="num-field" data-key="emailsSent" value="${data.emailsSent||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">CTAs</div><input type="number" class="num-field" data-key="ctas" value="${data.ctas||''}" inputmode="numeric"></div>
+                        </div>
+                    </div>
+                    <button class="btn-primary" id="saveNumbersBtn" style="margin-top:8px;margin-bottom:40px;">Save Numbers &#x2192;</button>
+                </div>
+            `;
+        };
+
+        const handleSaveNumbers = async () => {
+            const weekKey = getWeekKey();
+            const data = { week: parseInt(weekKey.split('_W')[1]), year: parseInt(weekKey.split('_')[0]) };
+            document.querySelectorAll('.num-field').forEach(input => {
+                const key = input.dataset.key;
+                const value = input.value.trim();
+                data[key] = value ? parseFloat(value) : null;
+            });
+            try {
+                await db.ref(`portal/entries/${currentUser.uid}/${weekKey}`).set(data);
+                alert('Numbers saved!');
+            } catch (err) { alert('Error saving: ' + err.message); }
+        };
+
+        // ── TASKS ──
+        const renderClientTasks = async () => {
+            const snap = await db.ref(`portal/tasks/${currentUser.uid}`).once('value');
+            const tasks = snap.val() || {};
+            return `
+                <div>
+                    <h2 class="page-title">Your Tasks</h2>
+                    <p class="page-subtitle">Stay on track with your coaching goals</p>
+                    ${Object.keys(tasks).length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#x2713;</div><p>No tasks yet</p></div>' : ''}
+                    ${Object.entries(tasks).map(([taskId, task]) => {
+                        const checklist = task.checklist || {};
+                        const items = Object.entries(checklist);
+                        const doneCount = items.filter(([, item]) => item.done).length;
+                        return `<div class="task-item">
+                            <div class="task-header">
+                                <div>
+                                    <div class="task-title">${task.title}</div>
+                                    ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
+                                </div>
+                                ${task.dueDate ? `<div class="task-due">${daysUntilDate(task.dueDate)}</div>` : ''}
+                            </div>
+                            <div class="checklist">
+                                ${items.map(([itemId, item]) => `
+                                    <div class="checklist-item">
+                                        <input type="checkbox" class="checklist-checkbox" data-task-id="${taskId}" data-item-id="${itemId}" ${item.done ? 'checked' : ''}>
+                                        <span class="checklist-text ${item.done ? 'done' : ''}">${item.text}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width:${items.length > 0 ? (doneCount/items.length*100) : 0}%"></div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            `;
+        };
+
+        const handleTaskChecklistChange = async (taskId, itemId, checked) => {
+            try {
+                await db.ref(`portal/tasks/${currentUser.uid}/${taskId}/checklist/${itemId}/done`).set(checked);
+                if (checked) await db.ref(`portal/tasks/${currentUser.uid}/${taskId}/checklist/${itemId}/doneAt`).set(new Date().toISOString());
+            } catch (err) { console.error('Error updating task:', err); }
+        };
+
+        // ── PROGRESS (fixed - no embedded script tag) ──
+        const renderClientProgress = async () => {
+            const snap = await db.ref(`portal/entries/${currentUser.uid}`).once('value');
+            const entries = snap.val() || {};
+            const last8Weeks = [];
+            for (let i = 7; i >= 0; i--) {
+                const d = new Date(); d.setDate(d.getDate() - (7 - i) * 7);
+                const s = new Date(d.getFullYear(), 0, 1);
+                const week = Math.ceil(((d - s) / 86400000 + s.getDay() + 1) / 7);
+                const wk = `${d.getFullYear()}_W${String(week).padStart(2, '0')}`;
+                last8Weeks.push({ week: wk.split('_')[1], ...(entries[wk] || {}) });
+            }
+            progressChartData = last8Weeks;
+            return `
+                <div>
+                    <h2 class="page-title">Your Progress</h2>
+                    <p class="page-subtitle">Track your growth over time</p>
+                    <div class="chart-card"><div class="chart-title">Revenue Trend</div><div id="revenueChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
+                    <div class="chart-card"><div class="chart-title">Occupancy vs Rebook Rate</div><div id="rateChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
+                    <div class="chart-card"><div class="chart-title">Social Followers</div><div id="followersChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
+                    <div class="chart-card"><div class="chart-title">Total Views</div><div id="viewsChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
+                    <div style="display:flex;gap:16px;margin-top:-8px;margin-bottom:24px;font-size:11px;color:#AAA;font-weight:400;">
+                        <span><span style="display:inline-block;width:10px;height:10px;background:#E8432D;border-radius:2px;margin-right:4px;"></span>Revenue / Occupancy</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:#16A34A;border-radius:2px;margin-right:4px;"></span>Rebook Rate</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:#0EA5E9;border-radius:2px;margin-right:4px;"></span>Followers</span>
+                        <span><span style="display:inline-block;width:10px;height:10px;background:#6366F1;border-radius:2px;margin-right:4px;"></span>Views</span>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderProgressCharts = () => {
+            if (!progressChartData) return;
+            const data = progressChartData;
+            const renderBar = (containerId, values, labels, color) => {
+                const container = document.getElementById(containerId);
+                if (!container) return;
+                const max = Math.max(...values) || 1;
+                container.innerHTML = values.map((val, i) => {
+                    const h = Math.max((val / max) * 90, val > 0 ? 3 : 0);
+                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;">
+                        <div style="flex:1;width:100%;display:flex;align-items:flex-end;">
+                            <div style="width:100%;height:${h}%;background:${color};border-radius:3px 3px 0 0;opacity:0.85;"></div>
+                        </div>
+                        <div style="font-size:9px;color:#BBB;font-weight:700;letter-spacing:0.05em;">${labels[i]}</div>
+                    </div>`;
+                }).join('');
+            };
+            renderBar('revenueChart', data.map(w => parseFloat(w.revenue)||0), data.map(w => w.week), '#E8432D');
+            renderBar('viewsChart', data.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)), data.map(w => w.week), '#6366F1');
+            renderBar('followersChart', data.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)), data.map(w => w.week), '#0EA5E9');
+            const rateEl = document.getElementById('rateChart');
+            if (rateEl) {
+                const occupancy = data.map(w => { const a=parseFloat(w.appointmentsAvailable)||0, f=parseFloat(w.appointmentsFilled)||0; return a>0?(f/a*100):0; });
+                const rebook = data.map(w => { const f=parseFloat(w.appointmentsFilled)||0, r=parseFloat(w.rebookings)||0; return f>0?(r/f*100):0; });
+                const max = Math.max(...occupancy, ...rebook) || 100;
+                rateEl.innerHTML = data.map((w, i) => {
+                    const oh = Math.max((occupancy[i]/max)*90, occupancy[i]>0?3:0);
+                    const rh = Math.max((rebook[i]/max)*90, rebook[i]>0?3:0);
+                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;">
+                        <div style="flex:1;width:100%;display:flex;align-items:flex-end;gap:1px;">
+                            <div style="flex:1;height:${oh}%;background:#E8432D;border-radius:3px 3px 0 0;opacity:0.8;"></div>
+                            <div style="flex:1;height:${rh}%;background:#16A34A;border-radius:3px 3px 0 0;opacity:0.8;"></div>
+                        </div>
+                        <div style="font-size:9px;color:#BBB;font-weight:700;">${w.week}</div>
+                    </div>`;
+                }).join('');
+            }
+        };
+
+        // ── CONTENT LIBRARY ──
+        const platformBadgeHtml = (platform) => {
+            const cls = {Instagram:'platform-instagram',TikTok:'platform-tiktok',YouTube:'platform-youtube'}[platform]||'';
+            return `<span class="platform-badge ${cls}">${platform||'Other'}</span>`;
+        };
+
+        const renderClientContent = async (uid = null) => {
+            const targetUid = uid || currentUser.uid;
+            const snap = await db.ref(`portal/content/${targetUid}`).once('value');
+            const contentRaw = snap.val() || {};
+            const contentList = Object.entries(contentRaw)
+                .map(([id, item]) => ({ id, ...item }))
+                .sort((a, b) => (parseFloat(b.views)||0) - (parseFloat(a.views)||0));
+            const isAdminView = uid !== null;
+            const rankClass = (i) => i===0?'rank-gold':i===1?'rank-silver':i===2?'rank-bronze':'';
+            return `
+                <div>
+                    <h2 class="page-title">Content Library</h2>
+                    <p class="page-subtitle">What&#x2019;s resonating with your audience &#x2014; sorted by views</p>
+                    ${!isAdminView ? `<button class="btn-add" id="addContentBtn">+ Add Content</button>` : ''}
+                    ${contentList.length === 0 ? `<div class="empty-state"><div class="empty-state-icon">&#x1F3AC;</div><p style="margin-bottom:6px;">No content yet</p><p style="font-size:13px;font-weight:400;">Add your posts to see what&#x2019;s performing best</p></div>` : ''}
+                    ${contentList.map((item, index) => `
+                        <div class="content-card">
+                            <div class="content-rank ${rankClass(index)}">#${index+1}</div>
+                            <div class="content-body">
+                                <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:8px;">
+                                    <div class="content-title">${item.title}</div>
+                                    ${!isAdminView ? `<button class="content-delete-btn" data-id="${item.id}" title="Delete">&#x00D7;</button>` : ''}
+                                </div>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+                                    ${platformBadgeHtml(item.platform)}
+                                    ${item.datePosted ? `<span style="color:#BBB;font-size:11px;font-weight:400;">${item.datePosted}</span>` : ''}
+                                    ${item.link ? `<a href="${item.link}" target="_blank" rel="noopener" style="color:#E8432D;font-size:11px;font-weight:700;text-decoration:none;">View &#x2192;</a>` : ''}
+                                </div>
+                            </div>
+                            <div class="content-views">
+                                <div class="content-views-number">${formatNumber(item.views)}</div>
+                                <div class="content-views-label">views</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                    <div class="modal-overlay" id="addContentModal">
+                        <div class="modal">
+                            <div class="modal-header">Add Content</div>
+                            <div class="form-group"><label class="form-label">Title</label><input type="text" id="contentTitle" class="form-input" placeholder="My transformation reel"></div>
+                            <div class="form-group"><label class="form-label">Platform</label><select id="contentPlatform" class="form-input" style="cursor:pointer;"><option>Instagram</option><option>TikTok</option><option>YouTube</option></select></div>
+                            <div class="form-group"><label class="form-label">Views</label><input type="number" id="contentViews" class="form-input" placeholder="0" inputmode="numeric"></div>
+                            <div class="form-group"><label class="form-label">Date Posted</label><input type="date" id="contentDate" class="form-input"></div>
+                            <div class="form-group"><label class="form-label">Link (optional)</label><input type="url" id="contentLink" class="form-input" placeholder="https://..."></div>
+                            <div class="error-message" id="contentError"></div>
+                            <button class="btn-primary" id="saveContentBtn">Add to Library</button>
+                            <button class="btn-secondary" id="cancelContentBtn">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const handleAddContent = async () => {
+            const title = document.getElementById('contentTitle').value.trim();
+            const platform = document.getElementById('contentPlatform').value;
+            const views = document.getElementById('contentViews').value;
+            const datePosted = document.getElementById('contentDate').value;
+            const link = document.getElementById('contentLink').value.trim();
+            const errorDiv = document.getElementById('contentError');
+            if (!title) { errorDiv.textContent = 'Please enter a title'; return; }
+            if (!views && views !== '0') { errorDiv.textContent = 'Please enter a view count'; return; }
+            try {
+                errorDiv.textContent = '';
+                const contentId = db.ref(`portal/content/${currentUser.uid}`).push().key;
+                await db.ref(`portal/content/${currentUser.uid}/${contentId}`).set({ title, platform, views: parseFloat(views)||0, datePosted: datePosted||null, link: link||null, createdAt: new Date().toISOString() });
+                setPage('content');
+            } catch (err) { errorDiv.textContent = 'Error: ' + err.message; }
+        };
+
+        const handleDeleteContent = async (contentId) => {
+            if (!confirm('Delete this entry?')) return;
+            try { await db.ref(`portal/content/${currentUser.uid}/${contentId}`).remove(); setPage('content'); }
+            catch (err) { alert('Error: ' + err.message); }
+        };
+
+        // ── ADMIN: CLIENTS ──
+        const renderAdminClients = async () => {
+            const snap = await db.ref('portal/users').once('value');
+            const users = snap.val() || {};
+            const clientUsers = Object.entries(users).filter(([, u]) => u.role === 'client');
+            return `
+                <div>
+                    <h2 class="page-title">Your Clients</h2>
+                    <p class="page-subtitle">${clientUsers.length} client${clientUsers.length !== 1 ? 's' : ''} enrolled</p>
+                    <input type="text" class="search-box" id="clientSearch" placeholder="Search clients...">
+                    <div class="client-grid">
+                        ${clientUsers.length === 0 ? '<div style="grid-column:1/-1;text-align:center;color:#CCC;padding:40px;font-weight:400;">No clients yet &#x2014; add your first one</div>' : ''}
+                        ${clientUsers.map(([uid, user]) => {
+                            const initials = ((user.firstName||'?')[0] + ((user.lastName||'?')[0])).toUpperCase();
+                            return `<div class="client-card" onclick="openClientDetail('${uid}')">
+                                <div class="client-avatar">${initials}</div>
+                                <div class="client-name">${user.firstName} ${user.lastName||''}</div>
+                                <div class="client-metric">Email <span class="client-metric-value" style="font-size:11px;">${user.email}</span></div>
+                                <button class="btn-secondary">View Details &#x2192;</button>
+                            </div>`;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        };
+
+        // ── ADMIN: ADD CLIENT ──
+        const renderAdminAddClient = () => `
+            <div style="max-width:480px;">
+                <h2 class="page-title">Add New Client</h2>
+                <p class="page-subtitle">Create a new client account</p>
+                <div class="card">
+                    <div class="form-group"><label class="form-label">First Name</label><input type="text" id="newClientFirstName" class="form-input" placeholder="John"></div>
+                    <div class="form-group"><label class="form-label">Last Name</label><input type="text" id="newClientLastName" class="form-input" placeholder="Doe"></div>
+                    <div class="form-group"><label class="form-label">Email</label><input type="email" id="newClientEmail" class="form-input" placeholder="john@example.com"></div>
+                    <div class="form-group"><label class="form-label">Temporary Password</label><input type="text" id="newClientPassword" class="form-input" placeholder="Scalo2024!"></div>
+                    <div class="error-message" id="addClientError"></div>
+                    <button class="btn-primary" id="createClientBtn">Create Account &#x2192;</button>
+                </div>
+            </div>
+        `;
+
+        const handleCreateClient = async () => {
+            const firstName = document.getElementById('newClientFirstName').value;
+            const lastName = document.getElementById('newClientLastName').value;
+            const email = document.getElementById('newClientEmail').value;
+            const password = document.getElementById('newClientPassword').value;
+            const errorDiv = document.getElementById('addClientError');
+            if (!firstName || !lastName || !email || !password) { errorDiv.textContent = 'Please fill in all fields'; return; }
+            try {
+                errorDiv.textContent = '';
+                const secondaryApp = firebase.initializeApp(FIREBASE_CONFIG, 'secondary_' + Date.now());
+                const secondaryAuth = secondaryApp.auth();
+                const cred = await secondaryAuth.createUserWithEmailAndPassword(email, password);
+                await db.ref(`portal/users/${cred.user.uid}`).set({ firstName, lastName, email, role: 'client', createdAt: new Date().toISOString() });
+                secondaryAuth.signOut();
+                secondaryApp.delete();
+                errorDiv.innerHTML = `<span style="color:#16A34A;">&#x2713; Account created! Email: ${email} / Password: ${password}</span>`;
+                setTimeout(() => {
+                    ['newClientFirstName','newClientLastName','newClientEmail','newClientPassword'].forEach(id => document.getElementById(id).value = '');
+                    errorDiv.textContent = '';
+                }, 4000);
+            } catch (err) { errorDiv.textContent = err.message || 'Error creating client'; }
+        };
+
+        // ── ADMIN: TASKS ──
+        const renderAdminTasks = async () => {
+            const snap = await db.ref('portal/users').once('value');
+            const users = snap.val() || {};
+            const clientUsers = Object.entries(users).filter(([, u]) => u.role === 'client');
+            return `
+                <div>
+                    <h2 class="page-title">Manage Tasks</h2>
+                    <p class="page-subtitle">Assign and track client tasks</p>
+                    <div class="card">
+                        <div class="section-header">Assign New Task</div>
+                        <div class="form-group"><label class="form-label">Select Client</label>
+                            <select id="taskClientSelect" class="form-input" style="cursor:pointer;">
+                                <option value="">Choose a client...</option>
+                                ${clientUsers.map(([uid, u]) => `<option value="${uid}">${u.firstName} ${u.lastName}</option>`).join('')}
+                            </select>
+                        </div>
+                        <div class="form-group"><label class="form-label">Task Title</label><input type="text" id="taskTitle" class="form-input" placeholder="Complete meal prep"></div>
+                        <div class="form-group"><label class="form-label">Description</label><textarea id="taskDescription" class="textarea" placeholder="Details about this task..."></textarea></div>
+                        <div class="form-group"><label class="form-label">Due Date</label><input type="date" id="taskDueDate" class="form-input"></div>
+                        <div id="checklistItemsContainer">
+                            <div class="form-group" style="margin-bottom:8px;">
+                                <label class="form-label">Checklist Items</label>
+                                <button class="btn-secondary" id="addChecklistItem" style="width:auto;margin-top:8px;">+ Add Item</button>
+                            </div>
+                        </div>
+                        <button class="btn-primary" id="assignTaskBtn" style="margin-top:16px;">Assign Task &#x2192;</button>
+                    </div>
+                    <div id="allTasksList" style="margin-top:24px;"></div>
+                </div>
+            `;
+        };
+
+        const handleAddChecklistItem = () => {
+            const container = document.getElementById('checklistItemsContainer');
+            const itemCount = container.querySelectorAll('.checklist-item-input').length;
+            const newItem = document.createElement('div');
+            newItem.className = 'form-group checklist-item-input';
+            newItem.style.marginBottom = '8px';
+            newItem.innerHTML = `<div style="display:flex;gap:8px;align-items:flex-end;">
+                <input type="text" class="form-input" placeholder="Item ${itemCount + 1}" style="flex:1;">
+                <button style="background:#E8432D;border:none;color:#fff;padding:12px 14px;border-radius:8px;cursor:pointer;font-weight:700;" onclick="this.parentElement.parentElement.remove();">&#x00D7;</button>
+            </div>`;
+            container.appendChild(newItem);
+        };
+
+        const handleAssignTask = async () => {
+            const clientId = document.getElementById('taskClientSelect').value;
+            const title = document.getElementById('taskTitle').value;
+            const description = document.getElementById('taskDescription').value;
+            const dueDate = document.getElementById('taskDueDate').value;
+            if (!clientId || !title) { alert('Please select a client and enter a title'); return; }
+            const checklist = {};
+            document.querySelectorAll('.checklist-item-input input').forEach((input, i) => {
+                if (input.value) checklist[`item_${i}`] = { text: input.value, done: false };
+            });
+            try {
+                const taskId = db.ref(`portal/tasks/${clientId}`).push().key;
+                await db.ref(`portal/tasks/${clientId}/${taskId}`).set({ title, description, dueDate, createdAt: new Date().toISOString(), createdBy: currentUser.uid, checklist: Object.keys(checklist).length > 0 ? checklist : { item_0: { text: 'Complete task', done: false } } });
+                alert('Task assigned!');
+                document.getElementById('taskTitle').value = '';
+                document.getElementById('taskDescription').value = '';
+                document.getElementById('taskDueDate').value = '';
+                document.getElementById('taskClientSelect').value = '';
+                document.querySelectorAll('.checklist-item-input').forEach(el => el.remove());
+            } catch (err) { alert('Error: ' + err.message); }
+        };
+
+        // ── ADMIN: CLIENT DETAIL ──
+        const renderAdminClientDetail = async (uid) => {
+            const [userSnap, entriesSnap, tasksSnap, contentSnap] = await Promise.all([
+                db.ref(`portal/users/${uid}`).once('value'),
+                db.ref(`portal/entries/${uid}`).once('value'),
+                db.ref(`portal/tasks/${uid}`).once('value'),
+                db.ref(`portal/content/${uid}`).once('value')
+            ]);
+            const user = userSnap.val() || {};
+            const entries = entriesSnap.val() || {};
+            const tasks = tasksSnap.val() || {};
+            const contentRaw = contentSnap.val() || {};
+            const weekKey = getWeekKey();
+            const currentEntry = entries[weekKey] || {};
+            const revenue = parseFloat(currentEntry.revenue)||0;
+            const expenses = parseFloat(currentEntry.expenses)||0;
+            const profitMargin = revenue > 0 ? ((revenue-expenses)/revenue*100) : 0;
+            const occupancy = (parseFloat(currentEntry.appointmentsAvailable)||0) > 0 ? (parseFloat(currentEntry.appointmentsFilled)||0)/parseFloat(currentEntry.appointmentsAvailable)*100 : 0;
+            const rebook = (parseFloat(currentEntry.appointmentsFilled)||0) > 0 ? (parseFloat(currentEntry.rebookings)||0)/parseFloat(currentEntry.appointmentsFilled)*100 : 0;
+            const initials = ((user.firstName||'?')[0]+((user.lastName||'?')[0])).toUpperCase();
+            const contentList = Object.entries(contentRaw).map(([id,item])=>({id,...item})).sort((a,b)=>(parseFloat(b.views)||0)-(parseFloat(a.views)||0));
+            const rankClass = (i) => i===0?'rank-gold':i===1?'rank-silver':i===2?'rank-bronze':'';
+            const taskList = Object.entries(tasks);
+            return `
+                <div>
+                    <button class="btn-back" onclick="setPage('clients')">&#x2190; Back to Clients</button>
+                    <div style="display:flex;align-items:center;gap:16px;margin-bottom:28px;">
+                        <div class="client-avatar" style="width:52px;height:52px;font-size:20px;">${initials}</div>
+                        <div>
+                            <div style="font-size:22px;font-weight:700;color:#0D0D0D;">${user.firstName||''} ${user.lastName||''}</div>
+                            <div style="color:#AAA;font-size:13px;font-weight:400;">${user.email||''}</div>
+                        </div>
+                    </div>
+                    <div style="font-size:10px;color:#BBB;letter-spacing:0.12em;text-transform:uppercase;margin-bottom:12px;">This Week &#x2014; ${weekKey}</div>
+                    <div class="card-grid">
+                        ${MetricCard('Revenue', revenue, null, true)}
+                        ${MetricCard('Profit Margin', profitMargin, null, false, true)}
+                        ${MetricCard('Occupancy', occupancy, null, false, true)}
+                        ${MetricCard('Rebook Rate', rebook, null, false, true)}
+                        ${MetricCard('New Clients', currentEntry.newClients, null)}
+                        ${MetricCard('Total Views', (parseFloat(currentEntry.instagramViews)||0)+(parseFloat(currentEntry.tiktokViews)||0), null)}
+                    </div>
+                    <div class="section-header">Content Library (${contentList.length})</div>
+                    ${contentList.length === 0 ? '<div style="color:#CCC;font-size:13px;font-weight:400;margin-bottom:24px;">No content added yet</div>' : ''}
+                    ${contentList.map((item, index) => `
+                        <div class="content-card">
+                            <div class="content-rank ${rankClass(index)}">#${index+1}</div>
+                            <div class="content-body">
+                                <div class="content-title">${item.title}</div>
+                                <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:4px;">
+                                    ${platformBadgeHtml(item.platform)}
+                                    ${item.datePosted ? `<span style="color:#BBB;font-size:11px;font-weight:400;">${item.datePosted}</span>` : ''}
+                                    ${item.link ? `<a href="${item.link}" target="_blank" rel="noopener" style="color:#E8432D;font-size:11px;font-weight:700;text-decoration:none;">View &#x2192;</a>` : ''}
+                                </div>
+                            </div>
+                            <div class="content-views">
+                                <div class="content-views-number">${formatNumber(item.views)}</div>
+                                <div class="content-views-label">views</div>
+                            </div>
+                        </div>
+                    `).join('')}
+                    <div class="section-header" style="margin-top:16px;">Tasks (${taskList.length})</div>
+                    ${taskList.length === 0 ? '<div style="color:#CCC;font-size:13px;font-weight:400;">No tasks assigned</div>' : ''}
+                    ${taskList.map(([taskId, task]) => {
+                        const items = Object.values(task.checklist||{});
+                        const doneCount = items.filter(i=>i.done).length;
+                        return `<div class="task-item">
+                            <div class="task-header">
+                                <div class="task-title">${task.title}</div>
+                                ${task.dueDate ? `<div class="task-due">${daysUntilDate(task.dueDate)}</div>` : ''}
+                            </div>
+                            <div style="color:#AAA;font-size:12px;font-weight:400;">${doneCount}/${items.length} items done</div>
+                            <div class="progress-bar" style="margin-top:8px;">
+                                <div class="progress-fill" style="width:${items.length>0?(doneCount/items.length*100):0}%"></div>
+                            </div>
+                        </div>`;
+                    }).join('')}
+                </div>
+            `;
+        };
+
+        // ── MAIN RENDER ──
+        const render = async () => {
+            const root = document.getElementById('root');
+            if (authLoading) { root.innerHTML = '<div class="loading">Loading...</div>'; return; }
+            if (!currentUser) {
+                root.innerHTML = renderLoginPage();
+                document.getElementById('signInBtn').addEventListener('click', handleSignIn);
+                document.getElementById('loginPassword').addEventListener('keypress', (e) => { if (e.key === 'Enter') handleSignIn(); });
+                return;
+            }
+
+            const isAdmin = currentUser.role === 'admin';
+            const activeCheck = (isAdmin && currentPage === 'clientDetail') ? 'clients' : currentPage;
+
+            const clientNavItems = [
+                { page: 'hub', icon: '&#x25C9;', label: 'Hub' },
+                { page: 'numbers', icon: '&#x25CA;', label: 'Numbers' },
+                { page: 'tasks', icon: '&#x2713;', label: 'Tasks' },
+                { page: 'content', icon: '&#x25B6;', label: 'Content' },
+                { page: 'progress', icon: '&#x25CE;', label: 'Progress' },
+            ];
+
+            const adminNavItems = [
+                { page: 'clients', icon: '&#x25C9;', label: 'Clients' },
+                { page: 'addClient', icon: '&#x2295;', label: 'Add Client' },
+                { page: 'tasks', icon: '&#x2713;', label: 'Tasks' },
+            ];
+
+            const navItems = isAdmin ? adminNavItems : clientNavItems;
+
+            const sidebarHtml = `
+                <div class="portal-sidebar">
+                    <img src="${SCALO_LOGO}" alt="SCALO" class="sidebar-logo">
+                    <div class="sidebar-nav">
+                        ${navItems.map(item => `
+                            <button class="sidebar-nav-item ${activeCheck === item.page ? 'active' : ''}" onclick="setPage('${item.page}')">
+                                <span class="sidebar-nav-icon">${item.icon}</span>
+                                <span class="nav-label">${item.label}</span>
+                            </button>
+                        `).join('')}
+                    </div>
+                    <button class="sidebar-signout" onclick="signOut()">
+                        <span class="sidebar-nav-icon">&#x2192;</span>
+                        <span class="nav-label">Sign Out</span>
+                    </button>
+                </div>
+            `;
+
+            let pageContent = '';
+            if (isAdmin) {
+                if (currentPage === 'clients') pageContent = await renderAdminClients();
+                else if (currentPage === 'addClient') pageContent = await renderAdminAddClient();
+                else if (currentPage === 'tasks') pageContent = await renderAdminTasks();
+                else if (currentPage === 'clientDetail' && selectedClientDetail) pageContent = await renderAdminClientDetail(selectedClientDetail);
+                else { currentPage = 'clients'; pageContent = await renderAdminClients(); }
+            } else {
+                if (currentPage === 'hub') pageContent = await renderClientHub();
+                else if (currentPage === 'numbers') pageContent = await renderClientNumbers();
+                else if (currentPage === 'tasks') pageContent = await renderClientTasks();
+                else if (currentPage === 'content') pageContent = await renderClientContent();
+                else if (currentPage === 'progress') pageContent = await renderClientProgress();
+            }
+
+            root.innerHTML = `
+                <div class="portal-layout">
+                    ${sidebarHtml}
+                    <div class="portal-content-area">
+                        ${pageContent}
+                    </div>
+                </div>
+            `;
+
+            if (currentPage === 'progress' && !isAdmin) setTimeout(renderProgressCharts, 50);
+
+            // Event listeners
+            if (isAdmin) {
+                if (currentPage === 'addClient') document.getElementById('createClientBtn').addEventListener('click', handleCreateClient);
+                else if (currentPage === 'tasks') {
+                    document.getElementById('addChecklistItem').addEventListener('click', handleAddChecklistItem);
+                    document.getElementById('assignTaskBtn').addEventListener('click', handleAssignTask);
+                }
+            } else {
+                if (currentPage === 'numbers') {
+                    document.getElementById('saveNumbersBtn').addEventListener('click', handleSaveNumbers);
+                } else if (currentPage === 'tasks') {
+                    document.querySelectorAll('.checklist-checkbox').forEach(checkbox => {
+                        checkbox.addEventListener('change', (e) => {
+                            handleTaskChecklistChange(e.target.dataset.taskId, e.target.dataset.itemId, e.target.checked);
+                        });
+                    });
+                } else if (currentPage === 'content') {
+                    const addBtn = document.getElementById('addContentBtn');
+                    const modal = document.getElementById('addContentModal');
+                    if (addBtn) addBtn.addEventListener('click', () => modal.classList.add('active'));
+                    const cancelBtn = document.getElementById('cancelContentBtn');
+                    if (cancelBtn) cancelBtn.addEventListener('click', () => modal.classList.remove('active'));
+                    const saveBtn = document.getElementById('saveContentBtn');
+                    if (saveBtn) saveBtn.addEventListener('click', handleAddContent);
+                    document.querySelectorAll('.content-delete-btn').forEach(btn => {
+                        btn.addEventListener('click', () => handleDeleteContent(btn.dataset.id));
+                    });
+                }
+            }
+        };
+
+        // ── GLOBALS ──
+        window.setPage = (page) => { currentPage = page; render(); };
+        window.signOut = async () => { await auth.signOut(); };
+        window.openClientDetail = (uid) => { selectedClientDetail = uid; currentPage = 'clientDetail'; render(); };
+
+        // ── AUTH ──
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                const snap = await db.ref(`portal/users/${user.uid}`).once('value');
+                if (snap.exists()) {
+                    currentUser = { uid: user.uid, ...snap.val() };
+                } else if (user.email === 'timbrace14@gmail.com') {
+                    const profile = { firstName: 'Tim', lastName: 'Brace', email: user.email, role: 'admin', createdAt: new Date().toISOString() };
+                    await db.ref(`portal/users/${user.uid}`).set(profile);
+                    currentUser = { uid: user.uid, ...profile };
+                }
+            } else { currentUser = null; }
+            authLoading = false;
+            render();
+        });
+
+        render();
+    </script>
+</body>
+</html>
