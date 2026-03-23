@@ -7,6 +7,7 @@
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -581,11 +582,11 @@
         const formatCurrency = (val) => val ? `£${(parseFloat(val) || 0).toLocaleString('en-GB', {maximumFractionDigits: 0})}` : '£0';
 
         const formatNumber = (val) => {
-            if (!val) return '0';
+            if (!val && val !== 0) return '0';
             const num = parseFloat(val);
             if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
-            if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
-            return num.toString();
+            if (num >= 10000) return (num / 1000).toFixed(1) + 'K';
+            return num.toLocaleString('en-GB');
         };
 
         const generateSparkline = (data, width = 100, height = 28) => {
@@ -703,6 +704,7 @@
         };
 
         // ── CLIENT HUB ──
+        let hubChartData = null;
         const renderClientHub = async () => {
             const weekKey = getWeekKey();
             const [entriesSnap, tasksSnap] = await Promise.all([
@@ -725,53 +727,128 @@
             const calcMetric = (key) => last8Weeks.map(w => parseFloat(w[key]) || 0);
             const revenue = parseFloat(currentEntry.revenue) || 0;
             const expenses = parseFloat(currentEntry.expenses) || 0;
+            const noShows = parseFloat(currentEntry.noShows) || 0;
+            const avgTicket = parseFloat(currentEntry.avgTicketPrice) || 0;
+            const lossOfEarnings = noShows * avgTicket;
+            const trueProfit = revenue - lossOfEarnings - expenses;
             const profitMargin = revenue > 0 ? ((revenue - expenses) / revenue * 100) : 0;
+            const trueMargin = revenue > 0 ? (trueProfit / revenue * 100) : 0;
             const occupancy = (parseFloat(currentEntry.appointmentsAvailable) || 0) > 0
                 ? (parseFloat(currentEntry.appointmentsFilled) || 0) / parseFloat(currentEntry.appointmentsAvailable) * 100 : 0;
             const rebook = (parseFloat(currentEntry.appointmentsFilled) || 0) > 0
                 ? (parseFloat(currentEntry.rebookings) || 0) / parseFloat(currentEntry.appointmentsFilled) * 100 : 0;
+
+            hubChartData = { profitMargin, occupancy, rebook };
 
             const incompleteTasks = Object.entries(tasks).filter(([, task]) => {
                 const checklist = task.checklist || {};
                 return Object.values(checklist).some(item => !item.done);
             }).slice(0, 3);
 
+            const totalTasks = Object.keys(tasks).length;
+            const completedTasks = Object.entries(tasks).filter(([, task]) => {
+                const items = Object.values(task.checklist || {});
+                return items.length > 0 && items.every(i => i.done);
+            }).length;
+
+            const hour = new Date().getHours();
+            const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+
             return `
                 <div>
                     <div class="greeting">
-                        <div class="greeting-text">Good morning, <strong>${currentUser.firstName}</strong></div>
+                        <div class="greeting-text">${greeting}, <strong>${currentUser.firstName}</strong></div>
                         <div class="week-badge">${weekKey}</div>
                     </div>
+
                     <div class="card-grid">
                         ${MetricCard('Total Revenue', revenue, calcMetric('revenue'), true)}
                         ${MetricCard('Expenses', expenses, calcMetric('expenses'), true)}
-                        ${MetricCard('Profit Margin', profitMargin, calcMetric('revenue'), false, true, profitMargin > 30)}
-                        ${MetricCard('Occupancy Rate', occupancy, calcMetric('appointmentsFilled'), false, true)}
-                        ${MetricCard('Rebook Rate', rebook, calcMetric('rebookings'), false, true)}
                         ${MetricCard('New Clients', currentEntry.newClients, calcMetric('newClients'))}
                         ${MetricCard('Total Views', (parseFloat(currentEntry.instagramViews)||0)+(parseFloat(currentEntry.tiktokViews)||0),
                             last8Weeks.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)))}
                         ${MetricCard('New Followers', (parseFloat(currentEntry.instagramFollowers)||0)+(parseFloat(currentEntry.tiktokFollowers)||0),
                             last8Weeks.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)))}
                     </div>
+
+                    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
+                        <div class="metric-card" style="text-align:center;">
+                            <div class="metric-label">Profit Margin</div>
+                            <canvas id="chartProfitMargin" width="90" height="90" style="margin:10px auto;display:block;"></canvas>
+                            <div style="font-size:22px;font-weight:800;color:${profitMargin>=30?'#16A34A':'#E8432D'};">${profitMargin.toFixed(1)}%</div>
+                        </div>
+                        <div class="metric-card" style="text-align:center;">
+                            <div class="metric-label">Occupancy Rate</div>
+                            <canvas id="chartOccupancy" width="90" height="90" style="margin:10px auto;display:block;"></canvas>
+                            <div style="font-size:22px;font-weight:800;color:${occupancy>=70?'#16A34A':'#E8432D'};">${occupancy.toFixed(1)}%</div>
+                        </div>
+                        <div class="metric-card" style="text-align:center;">
+                            <div class="metric-label">Rebook Rate</div>
+                            <canvas id="chartRebook" width="90" height="90" style="margin:10px auto;display:block;"></canvas>
+                            <div style="font-size:22px;font-weight:800;color:${rebook>=60?'#16A34A':'#E8432D'};">${rebook.toFixed(1)}%</div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="section-header" style="margin-bottom:14px;">💰 Profit Breakdown</div>
+                        <div style="display:flex;flex-direction:column;gap:10px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#F5F4F2;border-radius:10px;">
+                                <span style="font-size:13px;font-weight:500;color:#666;">Revenue</span>
+                                <span style="font-size:15px;font-weight:800;color:#0D0D0D;">${formatCurrency(revenue)}</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#FEF2F2;border-radius:10px;">
+                                <span style="font-size:13px;font-weight:500;color:#666;">Loss of Earnings <span style="font-size:11px;color:#AAA;">(${noShows} no-shows × ${formatCurrency(avgTicket)})</span></span>
+                                <span style="font-size:15px;font-weight:800;color:#E8432D;">−${formatCurrency(lossOfEarnings)}</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:#FEF2F2;border-radius:10px;">
+                                <span style="font-size:13px;font-weight:500;color:#666;">Expenses</span>
+                                <span style="font-size:15px;font-weight:800;color:#E8432D;">−${formatCurrency(expenses)}</span>
+                            </div>
+                            <div style="display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:${trueProfit>=0?'#F0FDF4':'#FEF2F2'};border-radius:10px;border:2px solid ${trueProfit>=0?'#16A34A':'#E8432D'};">
+                                <span style="font-size:14px;font-weight:700;color:#0D0D0D;">True Profit <span style="font-size:11px;font-weight:500;color:#AAA;">(${trueMargin.toFixed(1)}% margin)</span></span>
+                                <span style="font-size:18px;font-weight:800;color:${trueProfit>=0?'#16A34A':'#E8432D'};">${trueProfit>=0?'':'−'}${formatCurrency(Math.abs(trueProfit))}</span>
+                            </div>
+                        </div>
+                        ${avgTicket === 0 ? '<div style="margin-top:10px;font-size:12px;color:#AAA;font-weight:400;">💡 Add your average ticket price in Numbers to see loss of earnings</div>' : ''}
+                    </div>
+
                     <div class="card">
-                        <div class="section-header">Pending Tasks</div>
-                        ${incompleteTasks.length === 0 ? '<div style="color:#CCC;text-align:center;padding:20px;font-weight:400;">No pending tasks &#x2713;</div>' : ''}
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+                            <div class="section-header" style="margin-bottom:0;">🎯 Your Tasks</div>
+                            ${totalTasks > 0 ? `<div style="font-size:12px;color:#AAA;font-weight:500;">${completedTasks}/${totalTasks} complete</div>` : ''}
+                        </div>
+                        ${incompleteTasks.length === 0 && totalTasks === 0 ? `
+                            <div style="text-align:center;padding:24px 16px;">
+                                <div style="font-size:32px;margin-bottom:8px;">🎉</div>
+                                <div style="font-size:14px;color:#AAA;font-weight:400;">No tasks yet — your coach will assign some soon</div>
+                            </div>` : ''}
+                        ${incompleteTasks.length === 0 && totalTasks > 0 ? `
+                            <div style="text-align:center;padding:24px 16px;">
+                                <div style="font-size:32px;margin-bottom:8px;">🏆</div>
+                                <div style="font-size:15px;color:#16A34A;font-weight:700;">All tasks complete!</div>
+                                <div style="font-size:13px;color:#AAA;font-weight:400;margin-top:4px;">Incredible work this week</div>
+                            </div>` : ''}
                         ${incompleteTasks.map(([taskId, task]) => {
                             const checklist = task.checklist || {};
                             const items = Object.values(checklist);
                             const doneCount = items.filter(i => i.done).length;
-                            return `<div class="task-item">
+                            const pct = items.length > 0 ? Math.round(doneCount/items.length*100) : 0;
+                            const isUrgent = task.dueDate && daysUntilDate(task.dueDate).includes('ago');
+                            return `<div class="task-item" style="border-left:3px solid ${isUrgent?'#E8432D':pct>0?'#F59E0B':'#E2E8F0'};">
                                 <div class="task-header">
-                                    <div>
+                                    <div style="flex:1;">
                                         <div class="task-title">${task.title}</div>
                                         ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
                                     </div>
-                                    ${task.dueDate ? `<div class="task-due">${daysUntilDate(task.dueDate)}</div>` : ''}
+                                    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;">
+                                        ${task.dueDate ? `<div class="task-due" style="background:${isUrgent?'#FEE2E2':''};color:${isUrgent?'#E8432D':''}">${daysUntilDate(task.dueDate)}</div>` : ''}
+                                        <div style="font-size:13px;font-weight:800;color:${pct===100?'#16A34A':pct>0?'#F59E0B':'#BBB'};">${pct}%</div>
+                                    </div>
                                 </div>
                                 <div class="progress-bar">
-                                    <div class="progress-fill" style="width:${items.length > 0 ? (doneCount/items.length*100) : 0}%"></div>
+                                    <div class="progress-fill" style="width:${pct}%;background:${pct===100?'#16A34A':pct>50?'#F59E0B':'#E8432D'};"></div>
                                 </div>
+                                <div style="font-size:11px;color:#AAA;font-weight:400;margin-top:6px;">${doneCount} of ${items.length} steps done — <span onclick="setPage('tasks')" style="color:#E8432D;cursor:pointer;">complete now →</span></div>
                             </div>`;
                         }).join('')}
                     </div>
@@ -779,42 +856,105 @@
             `;
         };
 
+        const renderHubCharts = () => {
+            if (!hubChartData) return;
+            const makeDonut = (id, value, color) => {
+                const canvas = document.getElementById(id);
+                if (!canvas) return;
+                const pct = Math.min(Math.max(value, 0), 100);
+                new Chart(canvas, {
+                    type: 'doughnut',
+                    data: {
+                        datasets: [{
+                            data: [pct, 100 - pct],
+                            backgroundColor: [color, '#F0F0F0'],
+                            borderWidth: 0,
+                            hoverOffset: 0
+                        }]
+                    },
+                    options: {
+                        cutout: '72%',
+                        responsive: false,
+                        animation: { duration: 600 },
+                        plugins: { legend: { display: false }, tooltip: { enabled: false } }
+                    }
+                });
+            };
+            const pm = hubChartData.profitMargin;
+            const oc = hubChartData.occupancy;
+            const rb = hubChartData.rebook;
+            makeDonut('chartProfitMargin', pm, pm >= 30 ? '#16A34A' : '#E8432D');
+            makeDonut('chartOccupancy', oc, oc >= 70 ? '#16A34A' : '#E8432D');
+            makeDonut('chartRebook', rb, rb >= 60 ? '#16A34A' : '#E8432D');
+        };
+
         // ── NUMBERS ──
+        let selectedWeekKey = null;
+        const getWeekOptions = () => {
+            const options = [];
+            for (let i = 0; i < 12; i++) {
+                const d = new Date();
+                d.setDate(d.getDate() - i * 7);
+                const s = new Date(d.getFullYear(), 0, 1);
+                const week = Math.ceil(((d - s) / 86400000 + s.getDay() + 1) / 7);
+                const wk = `${d.getFullYear()}_W${String(week).padStart(2, '0')}`;
+                // Get the Monday of that week
+                const monday = new Date(d);
+                monday.setDate(d.getDate() - d.getDay() + 1);
+                const sunday = new Date(monday);
+                sunday.setDate(monday.getDate() + 6);
+                const fmt = (dt) => dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+                const label = i === 0 ? `This week (${fmt(monday)} – ${fmt(sunday)})` : `${fmt(monday)} – ${fmt(sunday)}`;
+                options.push({ key: wk, label });
+            }
+            return options;
+        };
+
         const renderClientNumbers = async () => {
-            const weekKey = getWeekKey();
-            const snap = await db.ref(`portal/entries/${currentUser.uid}/${weekKey}`).once('value');
+            if (!selectedWeekKey) selectedWeekKey = getWeekKey();
+            const snap = await db.ref(`portal/entries/${currentUser.uid}/${selectedWeekKey}`).once('value');
             const data = snap.val() || {};
+            const weekOptions = getWeekOptions();
             return `
                 <div>
-                    <h2 class="page-title">This Week&#x2019;s Numbers</h2>
-                    <p class="page-subtitle">${weekKey}</p>
+                    <h2 class="page-title">Log Your Numbers</h2>
+                    <p class="page-subtitle">Select a week then fill in your stats</p>
+                    <div class="card" style="margin-bottom:16px;">
+                        <div class="form-label" style="margin-bottom:8px;">📅 Select Week</div>
+                        <select id="weekSelector" class="form-input" style="cursor:pointer;font-weight:600;">
+                            ${weekOptions.map(o => `<option value="${o.key}" ${o.key === selectedWeekKey ? 'selected' : ''}>${o.label} — ${o.key}</option>`).join('')}
+                        </select>
+                    </div>
                     <div class="card">
                         <div class="section-header">Business</div>
                         <div class="input-grid">
-                            <div><div class="form-label">Appts Available</div><input type="number" class="num-field" data-key="appointmentsAvailable" value="${data.appointmentsAvailable||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">Appts Filled</div><input type="number" class="num-field" data-key="appointmentsFilled" value="${data.appointmentsFilled||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">New Clients</div><input type="number" class="num-field" data-key="newClients" value="${data.newClients||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">Rebookings</div><input type="number" class="num-field" data-key="rebookings" value="${data.rebookings||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">No Shows</div><input type="number" class="num-field" data-key="noShows" value="${data.noShows||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">Appts Available</div><input type="number" class="num-field" data-key="appointmentsAvailable" value="${data.appointmentsAvailable||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">Appts Filled</div><input type="number" class="num-field" data-key="appointmentsFilled" value="${data.appointmentsFilled||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">New Clients</div><input type="number" class="num-field" data-key="newClients" value="${data.newClients||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">Rebookings</div><input type="number" class="num-field" data-key="rebookings" value="${data.rebookings||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">No Shows</div><input type="number" class="num-field" data-key="noShows" value="${data.noShows||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">Avg Ticket Price</div>
+                                <div style="position:relative;"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#AAA;font-size:14px;">&#xA3;</span>
+                                <input type="number" class="num-field" data-key="avgTicketPrice" value="${data.avgTicketPrice||''}" inputmode="numeric" style="padding-left:28px;" placeholder="0"></div></div>
                             <div><div class="form-label">Revenue</div>
                                 <div style="position:relative;"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#AAA;font-size:14px;">&#xA3;</span>
-                                <input type="number" class="num-field" data-key="revenue" value="${data.revenue||''}" inputmode="numeric" style="padding-left:28px;"></div></div>
+                                <input type="number" class="num-field" data-key="revenue" value="${data.revenue||''}" inputmode="numeric" style="padding-left:28px;" placeholder="0"></div></div>
                             <div><div class="form-label">Expenses</div>
                                 <div style="position:relative;"><span style="position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#AAA;font-size:14px;">&#xA3;</span>
-                                <input type="number" class="num-field" data-key="expenses" value="${data.expenses||''}" inputmode="numeric" style="padding-left:28px;"></div></div>
+                                <input type="number" class="num-field" data-key="expenses" value="${data.expenses||''}" inputmode="numeric" style="padding-left:28px;" placeholder="0"></div></div>
                         </div>
                     </div>
                     <div class="card">
                         <div class="section-header">Social &amp; Content</div>
                         <div class="input-grid">
-                            <div><div class="form-label">IG Posts</div><input type="number" class="num-field" data-key="instagramPosts" value="${data.instagramPosts||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">IG Views</div><input type="number" class="num-field" data-key="instagramViews" value="${data.instagramViews||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">IG Followers</div><input type="number" class="num-field" data-key="instagramFollowers" value="${data.instagramFollowers||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">TikTok Posts</div><input type="number" class="num-field" data-key="tiktokPosts" value="${data.tiktokPosts||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">TikTok Views</div><input type="number" class="num-field" data-key="tiktokViews" value="${data.tiktokViews||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">TikTok Followers</div><input type="number" class="num-field" data-key="tiktokFollowers" value="${data.tiktokFollowers||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">Emails Sent</div><input type="number" class="num-field" data-key="emailsSent" value="${data.emailsSent||''}" inputmode="numeric"></div>
-                            <div><div class="form-label">CTAs</div><input type="number" class="num-field" data-key="ctas" value="${data.ctas||''}" inputmode="numeric"></div>
+                            <div><div class="form-label">IG Posts</div><input type="number" class="num-field" data-key="instagramPosts" value="${data.instagramPosts||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">IG Views</div><input type="number" class="num-field" data-key="instagramViews" value="${data.instagramViews||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">IG Followers</div><input type="number" class="num-field" data-key="instagramFollowers" value="${data.instagramFollowers||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">TikTok Posts</div><input type="number" class="num-field" data-key="tiktokPosts" value="${data.tiktokPosts||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">TikTok Views</div><input type="number" class="num-field" data-key="tiktokViews" value="${data.tiktokViews||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">TikTok Followers</div><input type="number" class="num-field" data-key="tiktokFollowers" value="${data.tiktokFollowers||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">Emails Sent</div><input type="number" class="num-field" data-key="emailsSent" value="${data.emailsSent||''}" inputmode="numeric" placeholder="0"></div>
+                            <div><div class="form-label">CTAs</div><input type="number" class="num-field" data-key="ctas" value="${data.ctas||''}" inputmode="numeric" placeholder="0"></div>
                         </div>
                     </div>
                     <button class="btn-primary" id="saveNumbersBtn" style="margin-top:8px;margin-bottom:40px;">Save Numbers &#x2192;</button>
@@ -823,7 +963,7 @@
         };
 
         const handleSaveNumbers = async () => {
-            const weekKey = getWeekKey();
+            const weekKey = selectedWeekKey || getWeekKey();
             const data = { week: parseInt(weekKey.split('_W')[1]), year: parseInt(weekKey.split('_')[0]) };
             document.querySelectorAll('.num-field').forEach(input => {
                 const key = input.dataset.key;
@@ -832,7 +972,8 @@
             });
             try {
                 await db.ref(`portal/entries/${currentUser.uid}/${weekKey}`).set(data);
-                alert('Numbers saved!');
+                const btn = document.getElementById('saveNumbersBtn');
+                if (btn) { btn.textContent = '✓ Saved!'; btn.style.background = '#16A34A'; setTimeout(() => { btn.textContent = 'Save Numbers →'; btn.style.background = ''; }, 2000); }
             } catch (err) { alert('Error saving: ' + err.message); }
         };
 
@@ -840,33 +981,80 @@
         const renderClientTasks = async () => {
             const snap = await db.ref(`portal/tasks/${currentUser.uid}`).once('value');
             const tasks = snap.val() || {};
+            const taskList = Object.entries(tasks);
+            const totalItems = taskList.reduce((sum, [, t]) => sum + Object.keys(t.checklist||{}).length, 0);
+            const doneItems = taskList.reduce((sum, [, t]) => sum + Object.values(t.checklist||{}).filter(i=>i.done).length, 0);
+            const overallPct = totalItems > 0 ? Math.round(doneItems / totalItems * 100) : 0;
+            const allDone = taskList.length > 0 && overallPct === 100;
+            const motivational = overallPct === 100 ? ['🏆 Champion!', 'Every task done. You\'re unstoppable.'] :
+                overallPct >= 75 ? ['🔥 Almost there!', 'You\'re crushing it — finish strong.'] :
+                overallPct >= 50 ? ['💪 Halfway done!', 'Great momentum — keep pushing.'] :
+                overallPct >= 25 ? ['⚡ Getting started!', 'You\'ve made a start — now build on it.'] :
+                ['🎯 Let\'s go!', 'Your coach set these to help you grow. Start now.'];
+
             return `
                 <div>
                     <h2 class="page-title">Your Tasks</h2>
-                    <p class="page-subtitle">Stay on track with your coaching goals</p>
-                    ${Object.keys(tasks).length === 0 ? '<div class="empty-state"><div class="empty-state-icon">&#x2713;</div><p>No tasks yet</p></div>' : ''}
-                    ${Object.entries(tasks).map(([taskId, task]) => {
+                    ${taskList.length > 0 ? `
+                    <div class="card" style="margin-bottom:16px;background:linear-gradient(135deg,#1a0a0a,#0a0a1a);color:#fff;border:none;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <div style="font-size:22px;font-weight:800;">${motivational[0]}</div>
+                                <div style="font-size:13px;color:rgba(255,255,255,0.65);font-weight:400;margin-top:2px;">${motivational[1]}</div>
+                            </div>
+                            <div style="text-align:right;">
+                                <div style="font-size:36px;font-weight:800;color:${overallPct===100?'#4ade80':'#E8432D'};">${overallPct}%</div>
+                                <div style="font-size:11px;color:rgba(255,255,255,0.5);font-weight:400;">${doneItems}/${totalItems} steps</div>
+                            </div>
+                        </div>
+                        <div style="margin-top:14px;height:6px;background:rgba(255,255,255,0.15);border-radius:3px;">
+                            <div style="height:100%;width:${overallPct}%;background:${overallPct===100?'#4ade80':'#E8432D'};border-radius:3px;transition:width 0.5s;"></div>
+                        </div>
+                    </div>` : ''}
+
+                    ${taskList.length === 0 ? `<div style="text-align:center;padding:60px 20px;">
+                        <div style="font-size:48px;margin-bottom:12px;">📋</div>
+                        <div style="font-size:16px;font-weight:700;color:#666;">No tasks yet</div>
+                        <div style="font-size:13px;color:#AAA;font-weight:400;margin-top:6px;">Your coach will assign tasks to help you grow</div>
+                    </div>` : ''}
+
+                    ${taskList.map(([taskId, task]) => {
                         const checklist = task.checklist || {};
                         const items = Object.entries(checklist);
                         const doneCount = items.filter(([, item]) => item.done).length;
-                        return `<div class="task-item">
+                        const pct = items.length > 0 ? Math.round(doneCount / items.length * 100) : 0;
+                        const isComplete = pct === 100;
+                        const isUrgent = task.dueDate && daysUntilDate(task.dueDate).includes('ago');
+                        return `<div class="task-item" style="border-left:4px solid ${isComplete?'#16A34A':isUrgent?'#E8432D':pct>0?'#F59E0B':'#E2E8F0'};${isComplete?'opacity:0.75;':''}">
                             <div class="task-header">
-                                <div>
-                                    <div class="task-title">${task.title}</div>
+                                <div style="flex:1;">
+                                    <div style="display:flex;align-items:center;gap:8px;">
+                                        <div class="task-title" style="${isComplete?'text-decoration:line-through;color:#AAA;':''}">${task.title}</div>
+                                        ${isComplete ? '<span style="font-size:11px;background:#DCFCE7;color:#16A34A;padding:2px 8px;border-radius:20px;font-weight:700;">✓ Done</span>' : ''}
+                                    </div>
                                     ${task.description ? `<div class="task-description">${task.description}</div>` : ''}
                                 </div>
-                                ${task.dueDate ? `<div class="task-due">${daysUntilDate(task.dueDate)}</div>` : ''}
+                                <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+                                    ${task.dueDate ? `<div class="task-due" style="${isUrgent?'background:#FEE2E2;color:#E8432D;':''}">${daysUntilDate(task.dueDate)}</div>` : ''}
+                                    <div style="font-size:15px;font-weight:800;color:${isComplete?'#16A34A':pct>50?'#F59E0B':'#E8432D'};">${pct}%</div>
+                                </div>
                             </div>
                             <div class="checklist">
                                 ${items.map(([itemId, item]) => `
-                                    <div class="checklist-item">
+                                    <div class="checklist-item" style="${item.done?'opacity:0.6;':''}">
                                         <input type="checkbox" class="checklist-checkbox" data-task-id="${taskId}" data-item-id="${itemId}" ${item.done ? 'checked' : ''}>
                                         <span class="checklist-text ${item.done ? 'done' : ''}">${item.text}</span>
+                                        ${item.done && item.doneAt ? `<span style="font-size:10px;color:#BBB;font-weight:400;margin-left:auto;">✓ done</span>` : ''}
                                     </div>
                                 `).join('')}
                             </div>
-                            <div class="progress-bar">
-                                <div class="progress-fill" style="width:${items.length > 0 ? (doneCount/items.length*100) : 0}%"></div>
+                            <div style="margin-top:10px;">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+                                    <span style="font-size:11px;color:#AAA;font-weight:500;">${doneCount} of ${items.length} steps complete</span>
+                                </div>
+                                <div class="progress-bar">
+                                    <div class="progress-fill" style="width:${pct}%;background:${isComplete?'#16A34A':pct>50?'#F59E0B':'#E8432D'};transition:width 0.4s;"></div>
+                                </div>
                             </div>
                         </div>`;
                     }).join('')}
@@ -881,74 +1069,91 @@
             } catch (err) { console.error('Error updating task:', err); }
         };
 
-        // ── PROGRESS (fixed - no embedded script tag) ──
+        // ── PROGRESS ──
+        let progressChartData = null;
         const renderClientProgress = async () => {
             const snap = await db.ref(`portal/entries/${currentUser.uid}`).once('value');
             const entries = snap.val() || {};
-            const last8Weeks = [];
+            const last8 = [];
             for (let i = 7; i >= 0; i--) {
-                const d = new Date(); d.setDate(d.getDate() - (7 - i) * 7);
+                const d = new Date(); d.setDate(d.getDate() - i * 7);
                 const s = new Date(d.getFullYear(), 0, 1);
                 const week = Math.ceil(((d - s) / 86400000 + s.getDay() + 1) / 7);
                 const wk = `${d.getFullYear()}_W${String(week).padStart(2, '0')}`;
-                last8Weeks.push({ week: wk.split('_')[1], ...(entries[wk] || {}) });
+                last8.push({ label: wk.split('_')[1], ...(entries[wk] || {}) });
             }
-            progressChartData = last8Weeks;
+            progressChartData = last8;
+            const hasData = last8.some(w => w.revenue || w.appointmentsFilled);
             return `
                 <div>
                     <h2 class="page-title">Your Progress</h2>
-                    <p class="page-subtitle">Track your growth over time</p>
-                    <div class="chart-card"><div class="chart-title">Revenue Trend</div><div id="revenueChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
-                    <div class="chart-card"><div class="chart-title">Occupancy vs Rebook Rate</div><div id="rateChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
-                    <div class="chart-card"><div class="chart-title">Social Followers</div><div id="followersChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
-                    <div class="chart-card"><div class="chart-title">Total Views</div><div id="viewsChart" style="height:140px;display:flex;align-items:flex-end;gap:4px;padding-bottom:20px;"></div></div>
-                    <div style="display:flex;gap:16px;margin-top:-8px;margin-bottom:24px;font-size:11px;color:#AAA;font-weight:400;">
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#E8432D;border-radius:2px;margin-right:4px;"></span>Revenue / Occupancy</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#16A34A;border-radius:2px;margin-right:4px;"></span>Rebook Rate</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#0EA5E9;border-radius:2px;margin-right:4px;"></span>Followers</span>
-                        <span><span style="display:inline-block;width:10px;height:10px;background:#6366F1;border-radius:2px;margin-right:4px;"></span>Views</span>
+                    <p class="page-subtitle">Last 8 weeks at a glance</p>
+                    ${!hasData ? `<div style="text-align:center;padding:60px 20px;color:#AAA;font-weight:400;">
+                        <div style="font-size:40px;margin-bottom:12px;">📊</div>
+                        <div style="font-size:16px;font-weight:700;color:#666;">No data yet</div>
+                        <div style="font-size:13px;margin-top:6px;">Log your numbers each week to see your trends here</div>
+                        <button onclick="setPage('numbers')" style="margin-top:20px;background:#E8432D;color:#fff;border:none;padding:12px 24px;border-radius:10px;font-weight:700;cursor:pointer;font-size:14px;">Log This Week →</button>
+                    </div>` : `
+                    <div class="chart-card">
+                        <div class="chart-title">💰 Revenue (£)</div>
+                        <canvas id="chartRevenue" height="120"></canvas>
                     </div>
+                    <div class="chart-card">
+                        <div class="chart-title">📈 Occupancy vs Rebook Rate (%)</div>
+                        <canvas id="chartRates" height="120"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">👥 Total Views</div>
+                        <canvas id="chartViews" height="120"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <div class="chart-title">➕ New Followers</div>
+                        <canvas id="chartFollowers" height="120"></canvas>
+                    </div>
+                    `}
                 </div>
             `;
         };
 
         const renderProgressCharts = () => {
             if (!progressChartData) return;
-            const data = progressChartData;
-            const renderBar = (containerId, values, labels, color) => {
-                const container = document.getElementById(containerId);
-                if (!container) return;
-                const max = Math.max(...values) || 1;
-                container.innerHTML = values.map((val, i) => {
-                    const h = Math.max((val / max) * 90, val > 0 ? 3 : 0);
-                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;">
-                        <div style="flex:1;width:100%;display:flex;align-items:flex-end;">
-                            <div style="width:100%;height:${h}%;background:${color};border-radius:3px 3px 0 0;opacity:0.85;"></div>
-                        </div>
-                        <div style="font-size:9px;color:#BBB;font-weight:700;letter-spacing:0.05em;">${labels[i]}</div>
-                    </div>`;
-                }).join('');
+            const d = progressChartData;
+            const labels = d.map(w => w.label);
+            const baseOpts = {
+                responsive: true,
+                animation: { duration: 500 },
+                plugins: { legend: { display: false }, tooltip: { callbacks: {} } },
+                scales: {
+                    x: { grid: { display: false }, ticks: { font: { size: 10, weight: '700' }, color: '#AAA' } },
+                    y: { grid: { color: '#F0F0F0' }, ticks: { font: { size: 10 }, color: '#AAA' }, beginAtZero: true }
+                }
             };
-            renderBar('revenueChart', data.map(w => parseFloat(w.revenue)||0), data.map(w => w.week), '#E8432D');
-            renderBar('viewsChart', data.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)), data.map(w => w.week), '#6366F1');
-            renderBar('followersChart', data.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)), data.map(w => w.week), '#0EA5E9');
-            const rateEl = document.getElementById('rateChart');
-            if (rateEl) {
-                const occupancy = data.map(w => { const a=parseFloat(w.appointmentsAvailable)||0, f=parseFloat(w.appointmentsFilled)||0; return a>0?(f/a*100):0; });
-                const rebook = data.map(w => { const f=parseFloat(w.appointmentsFilled)||0, r=parseFloat(w.rebookings)||0; return f>0?(r/f*100):0; });
-                const max = Math.max(...occupancy, ...rebook) || 100;
-                rateEl.innerHTML = data.map((w, i) => {
-                    const oh = Math.max((occupancy[i]/max)*90, occupancy[i]>0?3:0);
-                    const rh = Math.max((rebook[i]/max)*90, rebook[i]>0?3:0);
-                    return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;height:100%;">
-                        <div style="flex:1;width:100%;display:flex;align-items:flex-end;gap:1px;">
-                            <div style="flex:1;height:${oh}%;background:#E8432D;border-radius:3px 3px 0 0;opacity:0.8;"></div>
-                            <div style="flex:1;height:${rh}%;background:#16A34A;border-radius:3px 3px 0 0;opacity:0.8;"></div>
-                        </div>
-                        <div style="font-size:9px;color:#BBB;font-weight:700;">${w.week}</div>
-                    </div>`;
-                }).join('');
-            }
+            const lineDs = (data, color, fill) => [{
+                data,
+                borderColor: color,
+                backgroundColor: fill,
+                borderWidth: 2.5,
+                pointBackgroundColor: color,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                tension: 0.35,
+                fill: true
+            }];
+
+            const c1 = document.getElementById('chartRevenue');
+            if (c1) new Chart(c1, { type: 'line', data: { labels, datasets: lineDs(d.map(w => parseFloat(w.revenue)||0), '#E8432D', 'rgba(232,67,45,0.08)') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' £' + ctx.raw.toLocaleString('en-GB') } } } } });
+
+            const c2 = document.getElementById('chartRates');
+            if (c2) new Chart(c2, { type: 'line', data: { labels, datasets: [
+                { label: 'Occupancy', data: d.map(w => { const a=parseFloat(w.appointmentsAvailable)||0,f=parseFloat(w.appointmentsFilled)||0; return a>0?Math.round(f/a*100):0; }), borderColor: '#E8432D', backgroundColor: 'transparent', borderWidth: 2.5, pointBackgroundColor: '#E8432D', pointRadius: 4, tension: 0.35 },
+                { label: 'Rebook', data: d.map(w => { const f=parseFloat(w.appointmentsFilled)||0,r=parseFloat(w.rebookings)||0; return f>0?Math.round(r/f*100):0; }), borderColor: '#16A34A', backgroundColor: 'transparent', borderWidth: 2.5, pointBackgroundColor: '#16A34A', pointRadius: 4, tension: 0.35 }
+            ] }, options: { ...baseOpts, plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11, weight: '700' }, color: '#666', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.raw + '%' } } }, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, max: 100 } } } });
+
+            const c3 = document.getElementById('chartViews');
+            if (c3) new Chart(c3, { type: 'line', data: { labels, datasets: lineDs(d.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)), '#6366F1', 'rgba(99,102,241,0.08)') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw.toLocaleString('en-GB') + ' views' } } } } });
+
+            const c4 = document.getElementById('chartFollowers');
+            if (c4) new Chart(c4, { type: 'line', data: { labels, datasets: lineDs(d.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)), '#0EA5E9', 'rgba(14,165,233,0.08)') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' +' + ctx.raw.toLocaleString('en-GB') + ' followers' } } } } });
         };
 
         // ── CONTENT LIBRARY ──
@@ -1319,6 +1524,7 @@
             `;
 
             if (currentPage === 'progress' && !isAdmin) setTimeout(renderProgressCharts, 50);
+            if (currentPage === 'hub' && !isAdmin) setTimeout(renderHubCharts, 50);
 
             // Event listeners
             if (isAdmin) {
@@ -1330,6 +1536,8 @@
             } else {
                 if (currentPage === 'numbers') {
                     document.getElementById('saveNumbersBtn').addEventListener('click', handleSaveNumbers);
+                    const weekSel = document.getElementById('weekSelector');
+                    if (weekSel) weekSel.addEventListener('change', (e) => { selectedWeekKey = e.target.value; setPage('numbers'); });
                 } else if (currentPage === 'tasks') {
                     document.querySelectorAll('.checklist-checkbox').forEach(checkbox => {
                         checkbox.addEventListener('change', (e) => {
