@@ -714,6 +714,7 @@
             const entries = entriesSnap.val() || {};
             const tasks = tasksSnap.val() || {};
             const currentEntry = entries[weekKey] || {};
+            const allEntries = Object.values(entries);
 
             const last8Weeks = [];
             for (let i = 7; i >= 0; i--) {
@@ -731,14 +732,20 @@
             const avgTicket = parseFloat(currentEntry.avgTicketPrice) || 0;
             const lossOfEarnings = noShows * avgTicket;
             const trueProfit = revenue - lossOfEarnings - expenses;
-            const profitMargin = revenue > 0 ? ((revenue - expenses) / revenue * 100) : 0;
             const trueMargin = revenue > 0 ? (trueProfit / revenue * 100) : 0;
             const occupancy = (parseFloat(currentEntry.appointmentsAvailable) || 0) > 0
                 ? (parseFloat(currentEntry.appointmentsFilled) || 0) / parseFloat(currentEntry.appointmentsAvailable) * 100 : 0;
             const rebook = (parseFloat(currentEntry.appointmentsFilled) || 0) > 0
                 ? (parseFloat(currentEntry.rebookings) || 0) / parseFloat(currentEntry.appointmentsFilled) * 100 : 0;
 
-            hubChartData = { profitMargin, occupancy, rebook };
+            // All-time totals
+            const allRevenue = allEntries.reduce((s,e) => s+(parseFloat(e.revenue)||0), 0);
+            const allClients = allEntries.reduce((s,e) => s+(parseFloat(e.newClients)||0), 0);
+            const allViews = allEntries.reduce((s,e) => s+(parseFloat(e.instagramViews)||0)+(parseFloat(e.tiktokViews)||0), 0);
+            const allFollowers = allEntries.reduce((s,e) => s+(parseFloat(e.instagramFollowers)||0)+(parseFloat(e.tiktokFollowers)||0), 0);
+            const allNoShows = allEntries.reduce((s,e) => s+(parseFloat(e.noShows)||0), 0);
+
+            hubChartData = { trueMargin, occupancy, rebook, revenue, expenses, lossOfEarnings, trueProfit, noShows, avgTicket, appointmentsAvailable: parseFloat(currentEntry.appointmentsAvailable)||0, appointmentsFilled: parseFloat(currentEntry.appointmentsFilled)||0, rebookings: parseFloat(currentEntry.rebookings)||0 };
 
             const incompleteTasks = Object.entries(tasks).filter(([, task]) => {
                 const checklist = task.checklist || {};
@@ -761,8 +768,29 @@
                         <div class="week-badge">${weekKey}</div>
                     </div>
 
+                    <div style="font-size:10px;color:#AAA;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;font-weight:700;">📊 All Time Totals</div>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:20px;">
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Revenue</div>
+                            <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${formatCurrency(allRevenue)}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Clients</div>
+                            <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${allClients.toLocaleString('en-GB')}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Total Views</div>
+                            <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${formatNumber(allViews)}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">No Shows</div>
+                            <div style="font-size:18px;font-weight:800;color:#E8432D;">${allNoShows.toLocaleString('en-GB')}</div>
+                        </div>
+                    </div>
+
+                    <div style="font-size:10px;color:#AAA;letter-spacing:0.1em;text-transform:uppercase;margin-bottom:8px;font-weight:700;">📅 This Week — ${weekKey}</div>
                     <div class="card-grid">
-                        ${MetricCard('Total Revenue', revenue, calcMetric('revenue'), true)}
+                        ${MetricCard('Revenue', revenue, calcMetric('revenue'), true)}
                         ${MetricCard('Expenses', expenses, calcMetric('expenses'), true)}
                         ${MetricCard('New Clients', currentEntry.newClients, calcMetric('newClients'))}
                         ${MetricCard('Total Views', (parseFloat(currentEntry.instagramViews)||0)+(parseFloat(currentEntry.tiktokViews)||0),
@@ -772,20 +800,20 @@
                     </div>
 
                     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;">
-                        <div class="metric-card" style="text-align:center;">
-                            <div class="metric-label">Profit Margin</div>
+                        <div class="metric-card" style="text-align:center;cursor:pointer;" onclick="showDonutBreakdown('profit')">
+                            <div class="metric-label">True Profit Margin <span style="font-size:9px;color:#CCC;">tap for details</span></div>
                             <canvas id="chartProfitMargin" width="90" height="90" style="margin:10px auto;display:block;"></canvas>
-                            <div style="font-size:22px;font-weight:800;color:${profitMargin>=30?'#16A34A':'#E8432D'};">${profitMargin.toFixed(1)}%</div>
+                            <div style="font-size:22px;font-weight:800;color:${trueMargin>=75?'#16A34A':trueMargin>=50?'#F59E0B':'#E8432D'};">${trueMargin.toFixed(1)}%</div>
                         </div>
-                        <div class="metric-card" style="text-align:center;">
-                            <div class="metric-label">Occupancy Rate</div>
+                        <div class="metric-card" style="text-align:center;cursor:pointer;" onclick="showDonutBreakdown('occupancy')">
+                            <div class="metric-label">Occupancy Rate <span style="font-size:9px;color:#CCC;">tap for details</span></div>
                             <canvas id="chartOccupancy" width="90" height="90" style="margin:10px auto;display:block;"></canvas>
-                            <div style="font-size:22px;font-weight:800;color:${occupancy>=70?'#16A34A':'#E8432D'};">${occupancy.toFixed(1)}%</div>
+                            <div style="font-size:22px;font-weight:800;color:${occupancy>=75?'#16A34A':occupancy>=50?'#F59E0B':'#E8432D'};">${occupancy.toFixed(1)}%</div>
                         </div>
-                        <div class="metric-card" style="text-align:center;">
-                            <div class="metric-label">Rebook Rate</div>
+                        <div class="metric-card" style="text-align:center;cursor:pointer;" onclick="showDonutBreakdown('rebook')">
+                            <div class="metric-label">Rebook Rate <span style="font-size:9px;color:#CCC;">tap for details</span></div>
                             <canvas id="chartRebook" width="90" height="90" style="margin:10px auto;display:block;"></canvas>
-                            <div style="font-size:22px;font-weight:800;color:${rebook>=60?'#16A34A':'#E8432D'};">${rebook.toFixed(1)}%</div>
+                            <div style="font-size:22px;font-weight:800;color:${rebook>=75?'#16A34A':rebook>=50?'#F59E0B':'#E8432D'};">${rebook.toFixed(1)}%</div>
                         </div>
                     </div>
 
@@ -852,8 +880,59 @@
                             </div>`;
                         }).join('')}
                     </div>
+
+                    <!-- Donut Breakdown Modal -->
+                    <div id="donutModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:1000;align-items:center;justify-content:center;">
+                        <div style="background:#fff;border-radius:20px;padding:28px;max-width:360px;width:90%;margin:auto;">
+                            <div id="donutModalContent"></div>
+                            <button onclick="document.getElementById('donutModal').style.display='none'" style="margin-top:20px;width:100%;padding:12px;background:#0D0D0D;color:#fff;border:none;border-radius:10px;font-weight:700;font-size:14px;cursor:pointer;">Got it</button>
+                        </div>
+                    </div>
                 </div>
             `;
+        };
+
+        window.showDonutBreakdown = (type) => {
+            const d = hubChartData;
+            if (!d) return;
+            let html = '';
+            if (type === 'profit') {
+                const tips = d.trueMargin < 30 ? ['Reduce no-shows by sending appointment reminders', 'Review and cut unnecessary expenses', 'Increase your average ticket price'] :
+                    d.trueMargin < 60 ? ['Target 60%+ margin — consider upselling services', 'Track which expenses can be reduced'] :
+                    ['Excellent margin! Focus on growing revenue volume'];
+                html = `<div style="font-size:18px;font-weight:800;margin-bottom:4px;">💰 True Profit Margin</div>
+                <div style="font-size:13px;color:#AAA;margin-bottom:16px;">How it's calculated:</div>
+                <div style="background:#F5F4F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">Revenue: <strong>${formatCurrency(d.revenue)}</strong></div>
+                <div style="background:#FEF2F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">− Loss of Earnings (${d.noShows} no-shows × ${formatCurrency(d.avgTicket)}): <strong style="color:#E8432D;">−${formatCurrency(d.lossOfEarnings)}</strong></div>
+                <div style="background:#FEF2F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">− Expenses: <strong style="color:#E8432D;">−${formatCurrency(d.expenses)}</strong></div>
+                <div style="background:${d.trueProfit>=0?'#F0FDF4':'#FEF2F2'};border-radius:10px;padding:12px;font-size:13px;margin-bottom:16px;border:1.5px solid ${d.trueProfit>=0?'#16A34A':'#E8432D'};">= True Profit: <strong style="color:${d.trueProfit>=0?'#16A34A':'#E8432D'};">${formatCurrency(d.trueProfit)} (${d.trueMargin.toFixed(1)}%)</strong></div>
+                <div style="font-size:12px;font-weight:700;color:#666;margin-bottom:8px;">💡 Ways to improve:</div>
+                ${tips.map(t => `<div style="font-size:12px;color:#444;font-weight:400;padding:6px 0;border-bottom:1px solid #F0F0F0;">• ${t}</div>`).join('')}`;
+            } else if (type === 'occupancy') {
+                const tips = d.occupancy < 50 ? ['Fill empty slots with promotions or last-minute offers', 'Ask existing clients for referrals', 'Review your pricing — are you priced right for your market?'] :
+                    d.occupancy < 80 ? ['Send reminder campaigns to past clients', 'Introduce a loyalty programme to keep slots filled'] :
+                    ['Great occupancy! Consider adding more availability or raising prices'];
+                html = `<div style="font-size:18px;font-weight:800;margin-bottom:4px;">📅 Occupancy Rate</div>
+                <div style="font-size:13px;color:#AAA;margin-bottom:16px;">How it's calculated:</div>
+                <div style="background:#F5F4F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">Appointments Filled: <strong>${d.appointmentsFilled}</strong></div>
+                <div style="background:#F5F4F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">÷ Appointments Available: <strong>${d.appointmentsAvailable}</strong></div>
+                <div style="background:${d.occupancy>=70?'#F0FDF4':'#FEF2F2'};border-radius:10px;padding:12px;font-size:13px;margin-bottom:16px;border:1.5px solid ${d.occupancy>=70?'#16A34A':'#E8432D'};">= Occupancy: <strong style="color:${d.occupancy>=70?'#16A34A':'#E8432D'};">${d.occupancy.toFixed(1)}%</strong> (target: 70%+)</div>
+                <div style="font-size:12px;font-weight:700;color:#666;margin-bottom:8px;">💡 Ways to improve:</div>
+                ${tips.map(t => `<div style="font-size:12px;color:#444;font-weight:400;padding:6px 0;border-bottom:1px solid #F0F0F0;">• ${t}</div>`).join('')}`;
+            } else {
+                const tips = d.rebook < 40 ? ['Follow up with every client within 24 hours of their appointment', 'Offer a discount for rebooking before they leave', 'Ask for feedback — find out why they are not rebooking'] :
+                    d.rebook < 70 ? ['Introduce a rebooking reward or loyalty scheme', 'Send a reminder 1 week after each appointment'] :
+                    ['Excellent rebook rate! Focus on converting new clients at the same rate'];
+                html = `<div style="font-size:18px;font-weight:800;margin-bottom:4px;">🔄 Rebook Rate</div>
+                <div style="font-size:13px;color:#AAA;margin-bottom:16px;">How it's calculated:</div>
+                <div style="background:#F5F4F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">Rebookings: <strong>${d.rebookings}</strong></div>
+                <div style="background:#F5F4F2;border-radius:10px;padding:12px;font-size:13px;margin-bottom:8px;">÷ Appointments Filled: <strong>${d.appointmentsFilled}</strong></div>
+                <div style="background:${d.rebook>=60?'#F0FDF4':'#FEF2F2'};border-radius:10px;padding:12px;font-size:13px;margin-bottom:16px;border:1.5px solid ${d.rebook>=60?'#16A34A':'#E8432D'};">= Rebook Rate: <strong style="color:${d.rebook>=60?'#16A34A':'#E8432D'};">${d.rebook.toFixed(1)}%</strong> (target: 60%+)</div>
+                <div style="font-size:12px;font-weight:700;color:#666;margin-bottom:8px;">💡 Ways to improve:</div>
+                ${tips.map(t => `<div style="font-size:12px;color:#444;font-weight:400;padding:6px 0;border-bottom:1px solid #F0F0F0;">• ${t}</div>`).join('')}`;
+            }
+            document.getElementById('donutModalContent').innerHTML = html;
+            document.getElementById('donutModal').style.display = 'flex';
         };
 
         const renderHubCharts = () => {
@@ -864,28 +943,17 @@
                 const pct = Math.min(Math.max(value, 0), 100);
                 new Chart(canvas, {
                     type: 'doughnut',
-                    data: {
-                        datasets: [{
-                            data: [pct, 100 - pct],
-                            backgroundColor: [color, '#F0F0F0'],
-                            borderWidth: 0,
-                            hoverOffset: 0
-                        }]
-                    },
-                    options: {
-                        cutout: '72%',
-                        responsive: false,
-                        animation: { duration: 600 },
-                        plugins: { legend: { display: false }, tooltip: { enabled: false } }
-                    }
+                    data: { datasets: [{ data: [pct, 100-pct], backgroundColor: [color, '#F0F0F0'], borderWidth: 0, hoverOffset: 0 }] },
+                    options: { cutout: '72%', responsive: false, animation: { duration: 600 }, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
                 });
             };
-            const pm = hubChartData.profitMargin;
+            const ringColor = (v) => v >= 75 ? '#16A34A' : v >= 50 ? '#F59E0B' : '#E8432D';
+            const tm = hubChartData.trueMargin;
             const oc = hubChartData.occupancy;
             const rb = hubChartData.rebook;
-            makeDonut('chartProfitMargin', pm, pm >= 30 ? '#16A34A' : '#E8432D');
-            makeDonut('chartOccupancy', oc, oc >= 70 ? '#16A34A' : '#E8432D');
-            makeDonut('chartRebook', rb, rb >= 60 ? '#16A34A' : '#E8432D');
+            makeDonut('chartProfitMargin', tm, ringColor(tm));
+            makeDonut('chartOccupancy', oc, ringColor(oc));
+            makeDonut('chartRebook', rb, ringColor(rb));
         };
 
         // ── NUMBERS ──
@@ -910,20 +978,34 @@
             return options;
         };
 
+        const weekKeyFromInput = (val) => {
+            // val is like "2026-W13" → "2026_W13"
+            return val.replace('-W', '_W').replace('-', '_W');
+        };
+        const weekInputFromKey = (key) => {
+            // "2026_W13" → "2026-W13"
+            return key.replace('_W', '-W');
+        };
+
         const renderClientNumbers = async () => {
             if (!selectedWeekKey) selectedWeekKey = getWeekKey();
-            const snap = await db.ref(`portal/entries/${currentUser.uid}/${selectedWeekKey}`).once('value');
+            const [snap, allSnap] = await Promise.all([
+                db.ref(`portal/entries/${currentUser.uid}/${selectedWeekKey}`).once('value'),
+                db.ref(`portal/entries/${currentUser.uid}`).once('value')
+            ]);
             const data = snap.val() || {};
-            const weekOptions = getWeekOptions();
+            const allEntries = allSnap.val() || {};
+            const historyRows = Object.entries(allEntries)
+                .sort(([a], [b]) => b.localeCompare(a))
+                .slice(0, 20);
             return `
                 <div>
                     <h2 class="page-title">Log Your Numbers</h2>
-                    <p class="page-subtitle">Select a week then fill in your stats</p>
+                    <p class="page-subtitle">Pick a week using the calendar, fill in your stats, then save</p>
                     <div class="card" style="margin-bottom:16px;">
                         <div class="form-label" style="margin-bottom:8px;">📅 Select Week</div>
-                        <select id="weekSelector" class="form-input" style="cursor:pointer;font-weight:600;">
-                            ${weekOptions.map(o => `<option value="${o.key}" ${o.key === selectedWeekKey ? 'selected' : ''}>${o.label} — ${o.key}</option>`).join('')}
-                        </select>
+                        <input type="week" id="weekPicker" class="form-input" value="${weekInputFromKey(selectedWeekKey)}" style="cursor:pointer;font-weight:600;font-family:inherit;">
+                        <div style="font-size:12px;color:#AAA;margin-top:6px;font-weight:400;">Currently editing: <strong style="color:#0D0D0D;">${selectedWeekKey}</strong>${data.revenue||data.appointmentsFilled ? ' — <span style="color:#16A34A;">✓ has saved data</span>' : ' — no data yet'}</div>
                     </div>
                     <div class="card">
                         <div class="section-header">Business</div>
@@ -957,7 +1039,38 @@
                             <div><div class="form-label">CTAs</div><input type="number" class="num-field" data-key="ctas" value="${data.ctas||''}" inputmode="numeric" placeholder="0"></div>
                         </div>
                     </div>
-                    <button class="btn-primary" id="saveNumbersBtn" style="margin-top:8px;margin-bottom:40px;">Save Numbers &#x2192;</button>
+                    <button class="btn-primary" id="saveNumbersBtn" style="margin-top:8px;">Save Numbers &#x2192;</button>
+
+                    ${historyRows.length > 0 ? `
+                    <div class="card" style="margin-top:24px;margin-bottom:40px;">
+                        <div class="section-header" style="margin-bottom:14px;">📋 Logged History</div>
+                        <div style="overflow-x:auto;">
+                            <table style="width:100%;border-collapse:collapse;font-size:12px;">
+                                <thead>
+                                    <tr style="border-bottom:2px solid #F0F0F0;">
+                                        <th style="text-align:left;padding:8px 10px;color:#AAA;font-weight:700;white-space:nowrap;">Week</th>
+                                        <th style="text-align:right;padding:8px 10px;color:#AAA;font-weight:700;">Revenue</th>
+                                        <th style="text-align:right;padding:8px 10px;color:#AAA;font-weight:700;">Filled</th>
+                                        <th style="text-align:right;padding:8px 10px;color:#AAA;font-weight:700;">No Shows</th>
+                                        <th style="text-align:right;padding:8px 10px;color:#AAA;font-weight:700;">Views</th>
+                                        <th style="text-align:center;padding:8px 10px;color:#AAA;font-weight:700;">Edit</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${historyRows.map(([key, e]) => `
+                                        <tr style="border-bottom:1px solid #F5F4F2;${key===selectedWeekKey?'background:#FFF8F0;':''}" >
+                                            <td style="padding:10px 10px;font-weight:700;white-space:nowrap;">${key}${key===selectedWeekKey?' <span style="font-size:10px;color:#F59E0B;">● editing</span>':''}</td>
+                                            <td style="text-align:right;padding:10px 10px;color:#16A34A;font-weight:700;">${e.revenue?formatCurrency(e.revenue):'—'}</td>
+                                            <td style="text-align:right;padding:10px 10px;">${e.appointmentsFilled||'—'}</td>
+                                            <td style="text-align:right;padding:10px 10px;color:${e.noShows>0?'#E8432D':'#AAA'};">${e.noShows||'0'}</td>
+                                            <td style="text-align:right;padding:10px 10px;">${formatNumber((parseFloat(e.instagramViews)||0)+(parseFloat(e.tiktokViews)||0))}</td>
+                                            <td style="text-align:center;padding:10px 10px;"><button onclick="loadWeekForEdit('${key}')" style="background:${key===selectedWeekKey?'#F59E0B':'#F0F0F0'};border:none;padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;color:${key===selectedWeekKey?'#fff':'#666'};">${key===selectedWeekKey?'Editing':'Edit'}</button></td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>` : '<div style="margin-bottom:40px;"></div>'}
                 </div>
             `;
         };
@@ -1127,32 +1240,27 @@
                     y: { grid: { color: '#F0F0F0' }, ticks: { font: { size: 10 }, color: '#AAA' }, beginAtZero: true }
                 }
             };
-            const lineDs = (data, color, fill) => [{
+            const barDs = (data, color) => [{
                 data,
-                borderColor: color,
-                backgroundColor: fill,
-                borderWidth: 2.5,
-                pointBackgroundColor: color,
-                pointRadius: 4,
-                pointHoverRadius: 6,
-                tension: 0.35,
-                fill: true
+                backgroundColor: data.map((v, i) => i === data.length-1 ? color : color + '99'),
+                borderRadius: 6,
+                borderSkipped: false
             }];
 
             const c1 = document.getElementById('chartRevenue');
-            if (c1) new Chart(c1, { type: 'line', data: { labels, datasets: lineDs(d.map(w => parseFloat(w.revenue)||0), '#E8432D', 'rgba(232,67,45,0.08)') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' £' + ctx.raw.toLocaleString('en-GB') } } } } });
+            if (c1) new Chart(c1, { type: 'bar', data: { labels, datasets: barDs(d.map(w => parseFloat(w.revenue)||0), '#E8432D') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' £' + ctx.raw.toLocaleString('en-GB') } } } } });
 
             const c2 = document.getElementById('chartRates');
-            if (c2) new Chart(c2, { type: 'line', data: { labels, datasets: [
-                { label: 'Occupancy', data: d.map(w => { const a=parseFloat(w.appointmentsAvailable)||0,f=parseFloat(w.appointmentsFilled)||0; return a>0?Math.round(f/a*100):0; }), borderColor: '#E8432D', backgroundColor: 'transparent', borderWidth: 2.5, pointBackgroundColor: '#E8432D', pointRadius: 4, tension: 0.35 },
-                { label: 'Rebook', data: d.map(w => { const f=parseFloat(w.appointmentsFilled)||0,r=parseFloat(w.rebookings)||0; return f>0?Math.round(r/f*100):0; }), borderColor: '#16A34A', backgroundColor: 'transparent', borderWidth: 2.5, pointBackgroundColor: '#16A34A', pointRadius: 4, tension: 0.35 }
+            if (c2) new Chart(c2, { type: 'bar', data: { labels, datasets: [
+                { label: 'Occupancy %', data: d.map(w => { const a=parseFloat(w.appointmentsAvailable)||0,f=parseFloat(w.appointmentsFilled)||0; return a>0?Math.round(f/a*100):0; }), backgroundColor: '#E8432D99', borderRadius: 4 },
+                { label: 'Rebook %', data: d.map(w => { const f=parseFloat(w.appointmentsFilled)||0,r=parseFloat(w.rebookings)||0; return f>0?Math.round(r/f*100):0; }), backgroundColor: '#16A34A99', borderRadius: 4 }
             ] }, options: { ...baseOpts, plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11, weight: '700' }, color: '#666', boxWidth: 12 } }, tooltip: { callbacks: { label: ctx => ' ' + ctx.dataset.label + ': ' + ctx.raw + '%' } } }, scales: { ...baseOpts.scales, y: { ...baseOpts.scales.y, max: 100 } } } });
 
             const c3 = document.getElementById('chartViews');
-            if (c3) new Chart(c3, { type: 'line', data: { labels, datasets: lineDs(d.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)), '#6366F1', 'rgba(99,102,241,0.08)') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw.toLocaleString('en-GB') + ' views' } } } } });
+            if (c3) new Chart(c3, { type: 'bar', data: { labels, datasets: barDs(d.map(w => (parseFloat(w.instagramViews)||0)+(parseFloat(w.tiktokViews)||0)), '#6366F1') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' ' + ctx.raw.toLocaleString('en-GB') + ' views' } } } } });
 
             const c4 = document.getElementById('chartFollowers');
-            if (c4) new Chart(c4, { type: 'line', data: { labels, datasets: lineDs(d.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)), '#0EA5E9', 'rgba(14,165,233,0.08)') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' +' + ctx.raw.toLocaleString('en-GB') + ' followers' } } } } });
+            if (c4) new Chart(c4, { type: 'bar', data: { labels, datasets: barDs(d.map(w => (parseFloat(w.instagramFollowers)||0)+(parseFloat(w.tiktokFollowers)||0)), '#0EA5E9') }, options: { ...baseOpts, plugins: { ...baseOpts.plugins, tooltip: { callbacks: { label: ctx => ' +' + ctx.raw.toLocaleString('en-GB') + ' followers' } } } } });
         };
 
         // ── CONTENT LIBRARY ──
@@ -1394,7 +1502,10 @@
             const taskList = Object.entries(tasks);
             return `
                 <div>
-                    <button class="btn-back" onclick="setPage('clients')">&#x2190; Back to Clients</button>
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+                        <button class="btn-back" style="margin-bottom:0;" onclick="setPage('clients')">&#x2190; Back to Clients</button>
+                        <button onclick="deleteClient('${uid}')" style="background:#FEE2E2;color:#E8432D;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;">🗑 Remove Client</button>
+                    </div>
                     <div style="display:flex;align-items:center;gap:16px;margin-bottom:28px;">
                         <div class="client-avatar" style="width:52px;height:52px;font-size:20px;">${initials}</div>
                         <div>
@@ -1535,8 +1646,8 @@
             } else {
                 if (currentPage === 'numbers') {
                     document.getElementById('saveNumbersBtn').addEventListener('click', handleSaveNumbers);
-                    const weekSel = document.getElementById('weekSelector');
-                    if (weekSel) weekSel.addEventListener('change', (e) => { selectedWeekKey = e.target.value; setPage('numbers'); });
+                    const weekPicker = document.getElementById('weekPicker');
+                    if (weekPicker) weekPicker.addEventListener('change', (e) => { if (e.target.value) { selectedWeekKey = weekKeyFromInput(e.target.value); setPage('numbers'); } });
                 } else if (currentPage === 'tasks') {
                     document.querySelectorAll('.checklist-checkbox').forEach(checkbox => {
                         checkbox.addEventListener('change', (e) => {
@@ -1562,6 +1673,21 @@
         window.setPage = (page) => { currentPage = page; render(); };
         window.signOut = async () => { await auth.signOut(); };
         window.openClientDetail = (uid) => { selectedClientDetail = uid; currentPage = 'clientDetail'; render(); };
+        window.loadWeekForEdit = (key) => { selectedWeekKey = key; setPage('numbers'); };
+        window.deleteClient = async (uid) => {
+            if (!confirm('Remove this client? This will delete their profile. Their entries and tasks will also be removed. This cannot be undone.')) return;
+            try {
+                await Promise.all([
+                    db.ref(`portal/users/${uid}`).remove(),
+                    db.ref(`portal/entries/${uid}`).remove(),
+                    db.ref(`portal/tasks/${uid}`).remove(),
+                    db.ref(`portal/content/${uid}`).remove()
+                ]);
+                selectedClientDetail = null;
+                currentPage = 'clients';
+                render();
+            } catch (err) { alert('Error removing client: ' + err.message); }
+        };
 
         // ── AUTH ──
         auth.onAuthStateChanged(async (user) => {
