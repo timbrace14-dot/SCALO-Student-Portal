@@ -740,10 +740,13 @@
 
             // All-time totals
             const allRevenue = allEntries.reduce((s,e) => s+(parseFloat(e.revenue)||0), 0);
+            const allExpenses = allEntries.reduce((s,e) => s+(parseFloat(e.expenses)||0), 0);
             const allClients = allEntries.reduce((s,e) => s+(parseFloat(e.newClients)||0), 0);
             const allViews = allEntries.reduce((s,e) => s+(parseFloat(e.instagramViews)||0)+(parseFloat(e.tiktokViews)||0), 0);
             const allFollowers = allEntries.reduce((s,e) => s+(parseFloat(e.instagramFollowers)||0)+(parseFloat(e.tiktokFollowers)||0), 0);
             const allNoShows = allEntries.reduce((s,e) => s+(parseFloat(e.noShows)||0), 0);
+            const allRebookings = allEntries.reduce((s,e) => s+(parseFloat(e.rebookings)||0), 0);
+            const allTrueProfit = allRevenue - allExpenses;
 
             hubChartData = { trueMargin, occupancy, rebook, revenue, expenses, lossOfEarnings, trueProfit, noShows, avgTicket, appointmentsAvailable: parseFloat(currentEntry.appointmentsAvailable)||0, appointmentsFilled: parseFloat(currentEntry.appointmentsFilled)||0, rebookings: parseFloat(currentEntry.rebookings)||0 };
 
@@ -775,12 +778,28 @@
                             <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${formatCurrency(allRevenue)}</div>
                         </div>
                         <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
-                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Clients</div>
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">True Profit</div>
+                            <div style="font-size:18px;font-weight:800;color:${allTrueProfit>=0?'#16A34A':'#E8432D'};">${formatCurrency(allTrueProfit)}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Expenses</div>
+                            <div style="font-size:18px;font-weight:800;color:#E8432D;">${formatCurrency(allExpenses)}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">New Clients</div>
                             <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${allClients.toLocaleString('en-GB')}</div>
                         </div>
                         <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
                             <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Total Views</div>
                             <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${formatNumber(allViews)}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Followers</div>
+                            <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${formatNumber(allFollowers)}</div>
+                        </div>
+                        <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
+                            <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">Rebookings</div>
+                            <div style="font-size:18px;font-weight:800;color:#0D0D0D;">${allRebookings.toLocaleString('en-GB')}</div>
                         </div>
                         <div style="background:#fff;border-radius:14px;padding:14px 16px;border:1.5px solid #EFEFEF;">
                             <div style="font-size:10px;color:#AAA;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:4px;">No Shows</div>
