@@ -1070,7 +1070,6 @@
         };
 
         // ── PROGRESS ──
-        let progressChartData = null;
         const renderClientProgress = async () => {
             const snap = await db.ref(`portal/entries/${currentUser.uid}`).once('value');
             const entries = snap.val() || {};
